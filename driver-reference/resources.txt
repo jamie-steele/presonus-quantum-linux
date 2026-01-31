@@ -1,0 +1,6 @@
+=== Device Resources ===
+InstanceId: SWD\MMDEVAPI\{0.0.1.00000000}.{317298C0-6FB2-4D1B-A410-7CBD68D57330}
+
+
+=== Registry Resources ===
+Device Parameters found in registry

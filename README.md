@@ -31,12 +31,19 @@ Getting the **PreSonus Quantum 2626** Thunderbolt 3 audio interface working on L
 - **Try without reverse engineering:** [docs/TRY_WITHOUT_RE.md](docs/TRY_WITHOUT_RE.md) — `new_id` with snd_hda_intel was tried; rejected (Invalid argument). Path closed without reverse engineering.
 - **Stage 2 (Windows):** [docs/STAGE2_RUNBOOK.md](docs/STAGE2_RUNBOOK.md) — Profile on Windows 11, fill `notes/windows_profile.txt` for driver work.
 - **Next — build our own driver:** [docs/NEXT_DRIVER.md](docs/NEXT_DRIVER.md) — Options after Stage 2 (extend existing driver vs new ALSA PCI driver); points at kernel docs and repo notes.
+- **Windows driver reference:** [driver-reference/](driver-reference/) — PreSonus Windows driver files (INF + notes) for IDs and reverse engineering; `.sys`/`.cat`/`.PNF` kept locally only.
 
 ## Repository layout
 
 ```
 Quantum2626/
 ├── README.md
+├── driver-reference/         # Windows driver reference (INF, notes; no .sys in repo)
+│   ├── README.md             # What’s here and INF summary
+│   ├── pae_quantum.inf       # Windows setup info (PCI IDs, service, KMDF)
+│   ├── README.txt            # Collection notes from Windows
+│   ├── resources.txt
+│   └── services.txt
 ├── docs/
 │   ├── DIAGNOSIS.md           # Stage 1 diagnosis plan (Linux)
 │   ├── STAGE2_RUNBOOK.md      # Stage 2 — Windows 11 runbook

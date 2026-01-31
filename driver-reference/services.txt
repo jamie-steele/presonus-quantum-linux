@@ -1,0 +1,20 @@
+
+
+Name                : PreSonus Hardware Access Service
+RequiredServices    : {}
+CanPauseAndContinue : False
+CanShutdown         : True
+CanStop             : True
+DisplayName         : PreSonus Hardware Access Service
+DependentServices   : {}
+MachineName         : .
+ServiceName         : PreSonus Hardware Access Service
+ServicesDependedOn  : {}
+ServiceHandle       : 
+Status              : Running
+ServiceType         : Win32OwnProcess
+StartType           : Automatic
+Site                : 
+Container           : 
+
+

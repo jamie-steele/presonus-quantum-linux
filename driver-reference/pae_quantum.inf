@@ -1,0 +1,111 @@
+;
+; pae_quantum.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=MEDIA
+ClassGUID={4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider=%ManufacturerName%
+CatalogFile=pae_quantum.cat
+PnpLockdown=1
+DriverVer = 01/31/2023,1.37.0.0
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+pae_quantum.sys  = 1,,
+;
+
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64
+
+[Standard.NTamd64]
+"PreSonus Quantum"=PciDevice_Inst, PCI\VEN_1C67&DEV_0101&SUBSYS_01011C67
+"PreSonus Quantum 2"=PciDevice_Inst, PCI\VEN_1C67&DEV_0102&SUBSYS_01021C67
+"PreSonus Quantum 4848"=PciDevice_Inst, PCI\VEN_1C67&DEV_0103&SUBSYS_01031C67
+"PreSonus Quantum 2626"=PciDevice_Inst, PCI\VEN_1C67&DEV_0104&SUBSYS_01041C67
+"PreSonus Quantum Mobile"=PciDevice_Inst, PCI\VEN_1C67&DEV_0105&SUBSYS_01051C67
+
+[PciDevice_Inst.NT]
+Include=ks.inf, wdmaudio.inf
+Needs=KS.Registration, WDMAUDIO.Registration, mssysfx.CopyFilesAndRegister
+CopyFiles=Drivers_Dir
+AddReg=QuantumAddReg
+
+[Drivers_Dir]
+pae_quantum.sys
+
+[PciDevice_Inst.NT.HW]
+AddReg=AddReg_HW
+
+[AddReg_HW]
+; FILE_DEVICE_SOUND
+HKR,,DeviceType,0x10001,0x0000001D
+; SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGWGX;;;WD)(A;;GRGWGX;;;RC)"
+
+;******************************************************************************
+; make the driver available to the Multimedia system
+;------------------------------------------------------------------------------
+[QuantumAddReg]
+
+HKR,,Driver,,pae_quantum.sys
+HKR,,CLSID,,%Proxy.CLSID%
+
+HKR,,AssociatedFilters,,"wdmaud,swmidi,redbook"
+HKR,Drivers,SubClasses,,"wave,midi,mixer,aux"
+
+HKR,Drivers\wave\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\midi\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\mixer\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\aux\wdmaud.drv,Driver,,wdmaud.drv
+
+HKR,Drivers\wave\wdmaud.drv,Description,,%S_WdmAudDescription%
+HKR,Drivers\midi\wdmaud.drv,Description,,%S_WdmAudDescription%
+HKR,Drivers\mixer\wdmaud.drv,Description,,%S_WdmAudDescription%
+HKR,Drivers\aux\wdmaud.drv,Description,,%S_WdmAudDescription%
+
+
+;-------------- Service installation
+[PciDevice_Inst.NT.Services]
+Include=wdmaudio.inf
+Needs=WDMAUDIO.Registration.Services
+AddService = pae_quantum,%SPSVCINST_ASSOCSERVICE%, Service_Inst
+
+[Service_Inst]
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\pae_quantum.sys
+AddReg = DriverParametersAddReg
+
+[DriverParametersAddReg]
+; https://docs.microsoft.com/en-us/windows-hardware/drivers/pci/enabling-dma-remapping-for-device-drivers
+HKR,Parameters,DmaRemappingCompatible,0x00010001,1    ; where 1 = opt-in
+
+
+[PciDevice_Inst.NT.Wdf]
+KmdfService = pae_quantum, Inst_wdfsect
+[Inst_wdfsect]
+KmdfLibraryVersion = 1.19
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="PreSonus"
+ClassName="PreSonus Quantum devices"
+DiskName = "PreSonus Quantum Driver Installation Disk"
+REG_MULTI_SZ = 0x00010000
+
+Proxy.CLSID = "{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+
+S_WdmAudDescription="Quantum Audio Driver"

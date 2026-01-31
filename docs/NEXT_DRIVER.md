@@ -5,7 +5,7 @@ The “try without reverse engineering” path is closed: `new_id` with snd_hda_
 ## Where we are
 
 - **Linux:** Device visible as PCI 09:00.0 **1c67:0104** (PreSonus), class 0401 (Multimedia audio controller). No driver bound; no ALSA card.
-- **Windows:** You’ll run Stage 2 and fill `notes/windows_profile.txt` (driver name, .sys file, resources, IDs).
+- **Windows:** We have the Windows driver reference in **driver-reference/** (pae_quantum.inf, notes). Driver: `pae_quantum.sys`, service `pae_quantum`; IDs match 1c67:0104. Stage 2 runbook and `notes/windows_profile.txt` still useful for resources/behavior.
 
 ## What we need from Stage 2 (Windows)
 
@@ -32,6 +32,7 @@ The “try without reverse engineering” path is closed: `new_id` with snd_hda_
 
 When you’re ready to code:
 
+- **driver-reference/** — Windows INF and notes (PCI IDs, service name, KMDF version); use for reverse engineering. `.sys` kept locally only.
 - **notes/windows_profile.txt** — Filled from Stage 2; source of truth for IDs and resources.
 - **notes/DIAGNOSIS_RESULT.md** — Linux PCI details and BAR.
 - Kernel docs: [Writing an ALSA Driver](https://docs.kernel.org/sound/kernel-api/writing-an-alsa-driver.html), [PCI drivers](https://docs.kernel.org/PCI/pci.html).
