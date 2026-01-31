@@ -1,0 +1,28 @@
+# Quantum 2626 — Windows 11 profile (Stage 2)
+# Fill this in on a Windows 11 machine with the Quantum 2626 connected.
+# Linux already shows: PCI 1c67:0104 (09:00.0), no driver bound.
+
+Date:
+Windows version: (e.g. Win 11 23H2)
+
+## Identity (from Hardware Ids)
+Vendor ID (VEN):     0x____   (expect 0x1c67)
+Device ID (DEV):     0x____   (expect 0x0104)
+Subsystem Vendor:    0x____   (if any)
+Subsystem Device:    0x____   (if any)
+PCI or USB in Hardware Ids?:   PCI / USB
+
+## Driver
+Driver provider:
+Driver version/date:
+Driver file(s) (.sys):
+
+## Resources (from Properties → Resources)
+IRQ:
+Memory range(s):
+
+## PowerShell output (optional paste)
+(paste Get-PnpDevice / HardwareIds output here)
+
+## Notes
+(any other devices under Thunderbolt, MIDI device name, etc.)
