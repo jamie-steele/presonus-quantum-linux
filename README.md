@@ -32,12 +32,17 @@ Getting the **PreSonus Quantum 2626** Thunderbolt 3 audio interface working on L
 - **Stage 2 (Windows):** [docs/STAGE2_RUNBOOK.md](docs/STAGE2_RUNBOOK.md) — Profile on Windows 11, fill `notes/windows_profile.txt` for driver work.
 - **Next — build our own driver:** [docs/NEXT_DRIVER.md](docs/NEXT_DRIVER.md) — Options after Stage 2 (extend existing driver vs new ALSA PCI driver); points at kernel docs and repo notes.
 - **Windows driver reference:** [driver-reference/](driver-reference/) — PreSonus Windows driver files (INF + notes) for IDs and reverse engineering; `.sys`/`.cat`/`.PNF` kept locally only.
+- **Linux driver (skeleton):** [driver/](driver/) — Out-of-tree ALSA PCI driver; card + stub PCM so the device shows in `aplay -l`. Build with `make` in `driver/`, load with `insmod snd-quantum2626.ko`. Real audio needs reverse engineering (IRQ + BAR layout).
 
 ## Repository layout
 
 ```
 Quantum2626/
 ├── README.md
+├── driver/                   # Linux ALSA PCI driver (skeleton)
+│   ├── README.md             # Build, load, next steps
+│   ├── Makefile
+│   └── snd-quantum2626.c     # Single-file driver
 ├── driver-reference/         # Windows driver reference (INF, notes; no .sys in repo)
 │   ├── README.md             # What’s here and INF summary
 │   ├── pae_quantum.inf       # Windows setup info (PCI IDs, service, KMDF)
