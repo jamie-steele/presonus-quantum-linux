@@ -10,10 +10,14 @@
  */
 
 #include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
+#include <linux/timer.h>
+#include <linux/jiffies.h>
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/pcm.h>
@@ -41,6 +45,10 @@ MODULE_PARM_DESC(id, "ID string for PreSonus Quantum card.");
 module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable PreSonus Quantum card.");
 
+static bool dump_on_trigger;
+module_param(dump_on_trigger, bool, 0444);
+MODULE_PARM_DESC(dump_on_trigger, "Dump MMIO at prepare/trigger for reverse-engineering (default off).");
+
 MODULE_AUTHOR("Quantum2626 Linux driver project");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("PreSonus Quantum 2626 (and family) ALSA PCI driver (skeleton)");
@@ -50,10 +58,23 @@ struct quantum_chip {
 	struct pci_dev *pci;
 	void __iomem *iobase;	/* BAR 0, 1 MiB from lspci */
 	int irq;
+	bool irq_requested;
+	bool msi_allocated;	/* true if pci_alloc_irq_vectors(MSI) succeeded */
 	struct snd_pcm *pcm;
+	struct snd_pcm_substream *playback_substream;
+	struct snd_pcm_substream *capture_substream;
 };
 
-/* ----- Stub PCM ops (no hardware I/O yet) ----- */
+/* Per-substream: fake hw pointer so stream runs (timer-driven until we have real IRQ) */
+struct quantum_runtime {
+	spinlock_t lock;
+	snd_pcm_uframes_t position;
+	struct timer_list timer;
+	struct snd_pcm_substream *substream;
+	bool running;
+};
+
+/* ----- PCM ops: timer-driven fake pointer so aplay/arecord can run ----- */
 
 static const struct snd_pcm_hardware quantum_pcm_hw = {
 	.info = SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
@@ -73,17 +94,51 @@ static const struct snd_pcm_hardware quantum_pcm_hw = {
 	.periods_max = 1024,
 };
 
+static void quantum_period_elapsed(struct timer_list *t)
+{
+	struct quantum_runtime *qr = container_of(t, struct quantum_runtime, timer);
+	struct snd_pcm_substream *substream = qr->substream;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	snd_pcm_uframes_t period_frames = runtime->period_size;
+	snd_pcm_uframes_t buf_frames = runtime->buffer_size;
+	unsigned long flags;
+
+	if (!qr->running)
+		return;
+	spin_lock_irqsave(&qr->lock, flags);
+	qr->position += period_frames;
+	if (qr->position >= buf_frames)
+		qr->position -= buf_frames;
+	spin_unlock_irqrestore(&qr->lock, flags);
+	snd_pcm_period_elapsed(substream);
+	mod_timer(&qr->timer, jiffies + msecs_to_jiffies((period_frames * 1000) / runtime->rate));
+}
+
 static int quantum_pcm_open(struct snd_pcm_substream *substream)
 {
-	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct quantum_runtime *qr;
 
-	runtime->hw = quantum_pcm_hw;
+	qr = kzalloc(sizeof(*qr), GFP_KERNEL);
+	if (!qr)
+		return -ENOMEM;
+	spin_lock_init(&qr->lock);
+	qr->substream = substream;
+	timer_setup(&qr->timer, quantum_period_elapsed, 0);
+	substream->runtime->private_data = qr;
+	substream->runtime->hw = quantum_pcm_hw;
 	return 0;
 }
 
 static int quantum_pcm_close(struct snd_pcm_substream *substream)
 {
-	(void)substream;
+	struct quantum_runtime *qr = substream->runtime->private_data;
+
+	if (qr) {
+		qr->running = false;
+		timer_delete_sync(&qr->timer);
+		kfree(qr);
+		substream->runtime->private_data = NULL;
+	}
 	return 0;
 }
 
@@ -103,21 +158,82 @@ static int quantum_pcm_hw_free(struct snd_pcm_substream *substream)
 
 static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 {
-	(void)substream;
+	struct quantum_chip *chip = substream->pcm->private_data;
+	struct quantum_runtime *qr = substream->runtime->private_data;
+	int i;
+
+	if (qr)
+		qr->position = 0;
+	if (dump_on_trigger && chip->iobase) {
+		dev_info(&chip->pci->dev, "MMIO at prepare:");
+		for (i = 0; i < 64; i += 4)
+			dev_info(&chip->pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
+	}
 	return 0;
 }
 
 static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
-	(void)substream;
-	(void)cmd;
+	struct quantum_chip *chip = substream->pcm->private_data;
+	struct quantum_runtime *qr = substream->runtime->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	unsigned long period_msec;
+	int i;
+
+	if (!qr)
+		return -EINVAL;
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		if (dump_on_trigger && chip->iobase) {
+			dev_info(&chip->pci->dev, "MMIO at trigger START:");
+			for (i = 0; i < 64; i += 4)
+				dev_info(&chip->pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
+		}
+		qr->running = true;
+		qr->position = 0;
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			chip->playback_substream = substream;
+		else
+			chip->capture_substream = substream;
+		/* Use timer only if we didn't get an IRQ (fallback) */
+		if (!chip->irq_requested) {
+			period_msec = (runtime->period_size * 1000) / runtime->rate;
+			if (period_msec < 1)
+				period_msec = 1;
+			mod_timer(&qr->timer, jiffies + msecs_to_jiffies(period_msec));
+		}
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		if (dump_on_trigger && chip->iobase) {
+			dev_info(&chip->pci->dev, "MMIO at trigger STOP:");
+			for (i = 0; i < 64; i += 4)
+				dev_info(&chip->pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
+		}
+		qr->running = false;
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			chip->playback_substream = NULL;
+		else
+			chip->capture_substream = NULL;
+		timer_delete_sync(&qr->timer);
+		break;
+	default:
+		return -EINVAL;
+	}
 	return 0;
 }
 
 static snd_pcm_uframes_t quantum_pcm_pointer(struct snd_pcm_substream *substream)
 {
-	(void)substream;
-	return 0;
+	struct quantum_runtime *qr = substream->runtime->private_data;
+	unsigned long flags;
+	snd_pcm_uframes_t pos = 0;
+
+	if (qr) {
+		spin_lock_irqsave(&qr->lock, flags);
+		pos = qr->position;
+		spin_unlock_irqrestore(&qr->lock, flags);
+	}
+	return pos;
 }
 
 static const struct snd_pcm_ops quantum_pcm_ops = {
@@ -153,22 +269,75 @@ static void snd_quantum_free(struct snd_card *card)
 {
 	struct quantum_chip *chip = card->private_data;
 
+	if (chip->irq_requested && chip->irq >= 0)
+		free_irq(chip->irq, chip);
+	if (chip->msi_allocated)
+		pci_free_irq_vectors(chip->pci);
 	if (chip->iobase)
 		pci_iounmap(chip->pci, chip->iobase);
 	pci_release_regions(chip->pci);
 	pci_disable_device(chip->pci);
 }
 
-/* ----- Create chip: enable PCI, claim BAR, optional IRQ ----- */
+/* ----- Interrupt: signal period elapsed for active substreams ----- */
+
+static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
+{
+	struct quantum_chip *chip = dev_id;
+	struct snd_pcm_substream *s;
+	struct quantum_runtime *qr;
+	unsigned long flags;
+	snd_pcm_uframes_t period_frames, buf_frames;
+	irqreturn_t handled = IRQ_NONE;
+
+	s = chip->playback_substream;
+	if (s && snd_pcm_running(s)) {
+		qr = s->runtime->private_data;
+		if (qr) {
+			period_frames = s->runtime->period_size;
+			buf_frames = s->runtime->buffer_size;
+			spin_lock_irqsave(&qr->lock, flags);
+			qr->position += period_frames;
+			if (qr->position >= buf_frames)
+				qr->position -= buf_frames;
+			spin_unlock_irqrestore(&qr->lock, flags);
+			snd_pcm_period_elapsed(s);
+			handled = IRQ_HANDLED;
+		}
+	}
+	s = chip->capture_substream;
+	if (s && snd_pcm_running(s)) {
+		qr = s->runtime->private_data;
+		if (qr) {
+			period_frames = s->runtime->period_size;
+			buf_frames = s->runtime->buffer_size;
+			spin_lock_irqsave(&qr->lock, flags);
+			qr->position += period_frames;
+			if (qr->position >= buf_frames)
+				qr->position -= buf_frames;
+			spin_unlock_irqrestore(&qr->lock, flags);
+			snd_pcm_period_elapsed(s);
+			handled = IRQ_HANDLED;
+		}
+	}
+	return handled;
+}
+
+/* ----- Create chip: enable PCI, claim BAR, IRQ, MMIO probe ----- */
 
 static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 {
 	struct quantum_chip *chip = card->private_data;
 	int err;
+	int i;
 
 	chip->card = card;
 	chip->pci = pci;
-	chip->irq = -1;
+	chip->irq = pci->irq;
+	chip->irq_requested = false;
+	chip->msi_allocated = false;
+	chip->playback_substream = NULL;
+	chip->capture_substream = NULL;
 
 	err = pci_enable_device(pci);
 	if (err < 0)
@@ -191,9 +360,36 @@ static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 		goto fail_regions;
 	}
 
-	/* IRQ: request when we have a real handler (reverse-engineer from pae_quantum.sys) */
-	if (pci->irq)
-		card->sync_irq = pci->irq;
+	/* Log first 64 bytes of BAR 0 for reverse-engineering (word-aligned) */
+	for (i = 0; i < 64; i += 4)
+		dev_info(&pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
+
+	/* Prefer MSI (Thunderbolt PCIe often has legacy IRQ 0); fall back to legacy if valid */
+	if (pci_alloc_irq_vectors(pci, 1, 1, PCI_IRQ_MSI) == 1) {
+		chip->irq = pci_irq_vector(pci, 0);
+		chip->msi_allocated = true;
+	} else {
+		pci_free_irq_vectors(pci);
+		chip->irq = pci->irq;
+	}
+	/* Only request if we have a usable IRQ (legacy IRQ 0 is the PIT on x86, not our device) */
+	if (chip->irq > 0) {
+		err = request_irq(chip->irq, snd_quantum_interrupt, IRQF_SHARED,
+				  DRV_NAME, chip);
+		if (err == 0) {
+			chip->irq_requested = true;
+			card->sync_irq = chip->irq;
+		} else {
+			dev_warn(&pci->dev, "cannot request irq %d, using timer fallback: %d\n",
+				 chip->irq, err);
+		}
+	} else if (chip->irq == 0) {
+		dev_info(&pci->dev, "legacy irq 0 (invalid), using timer fallback\n");
+	}
+	if (!chip->irq_requested && chip->msi_allocated) {
+		pci_free_irq_vectors(pci);
+		chip->msi_allocated = false;
+	}
 
 	err = snd_quantum_pcm_new(chip);
 	if (err < 0)
@@ -202,6 +398,14 @@ static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 	return 0;
 
 fail_pcm:
+	if (chip->irq_requested) {
+		free_irq(chip->irq, chip);
+		chip->irq_requested = false;
+	}
+	if (chip->msi_allocated) {
+		pci_free_irq_vectors(pci);
+		chip->msi_allocated = false;
+	}
 	pci_iounmap(pci, chip->iobase);
 	chip->iobase = NULL;
 fail_regions:
