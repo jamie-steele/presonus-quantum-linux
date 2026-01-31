@@ -1,11 +1,11 @@
-# Windows 11 — Capture PreSonus Quantum 2626 device info for Linux driver work.
+# Windows 11 - Capture PreSonus Quantum 2626 device info for Linux driver work.
 # Run in PowerShell (no Administrator required for device listing).
 # Usage: .\windows_capture_quantum.ps1
 # Copy the output to notes/windows_capture.txt in the repo.
 
 $ErrorActionPreference = "SilentlyContinue"
 
-Write-Host "=== Quantum 2626 — Windows capture ===" -ForegroundColor Cyan
+Write-Host "=== Quantum 2626 - Windows capture ===" -ForegroundColor Cyan
 Write-Host "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 Write-Host "OS: $([System.Environment]::OSVersion.VersionString)"
 Write-Host ""
