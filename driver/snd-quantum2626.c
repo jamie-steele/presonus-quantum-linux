@@ -70,6 +70,17 @@ MODULE_AUTHOR("Quantum2626 Linux driver project");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("PreSonus Quantum 2626 (and family) ALSA PCI driver (skeleton)");
 
+/* Register offsets (from Ghidra analysis) */
+#define QUANTUM_REG_VERSION	0x0000	/* Version/ID register */
+#define QUANTUM_REG_STATUS1	0x0004	/* Status/Control */
+#define QUANTUM_REG_STATUS2	0x0008	/* Status/Control */
+#define QUANTUM_REG_STATUS3	0x0010	/* Status/Control */
+#define QUANTUM_REG_STATUS4	0x0014	/* Status/Control */
+#define QUANTUM_REG_CONTROL	0x0100	/* Control register (write 0x8) */
+#define QUANTUM_REG_STATUS5	0x0104	/* Status/Control */
+#define QUANTUM_REG_BUFFER0	0x10300	/* Buffer/Channel register (DMA buffer address) */
+#define QUANTUM_REG_BUFFER1	0x10304	/* Buffer/Channel register (DMA buffer address) */
+
 struct quantum_chip {
 	struct snd_card *card;
 	struct pci_dev *pci;
@@ -80,6 +91,12 @@ struct quantum_chip {
 	struct snd_pcm *pcm;
 	struct snd_pcm_substream *playback_substream;
 	struct snd_pcm_substream *capture_substream;
+	
+	/* Hardware state */
+	dma_addr_t playback_dma_addr;
+	dma_addr_t capture_dma_addr;
+	size_t playback_buffer_size;
+	size_t capture_buffer_size;
 };
 
 /* Per-substream: fake hw pointer so stream runs (timer-driven until we have real IRQ) */
@@ -162,8 +179,15 @@ static int quantum_pcm_close(struct snd_pcm_substream *substream)
 static int quantum_pcm_hw_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *hw_params)
 {
-	(void)substream;
-	(void)hw_params;
+	struct quantum_chip *chip = substream->pcm->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	
+	/* Store buffer size for later use in prepare() */
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		chip->playback_buffer_size = params_buffer_bytes(hw_params);
+	else
+		chip->capture_buffer_size = params_buffer_bytes(hw_params);
+	
 	return 0;
 }
 
@@ -177,15 +201,61 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct quantum_chip *chip = substream->pcm->private_data;
 	struct quantum_runtime *qr = substream->runtime->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	dma_addr_t dma_addr;
+	size_t buffer_size;
 	int i;
+	u32 val;
 
 	if (qr)
 		qr->position = 0;
-	if (dump_on_trigger && chip->iobase) {
+
+	if (!chip->iobase)
+		return -EIO;
+
+	/* Get DMA address and buffer size */
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		dma_addr = runtime->dma_addr;
+		buffer_size = chip->playback_buffer_size;
+		chip->playback_dma_addr = dma_addr;
+	} else {
+		dma_addr = runtime->dma_addr;
+		buffer_size = chip->capture_buffer_size;
+		chip->capture_dma_addr = dma_addr;
+	}
+
+	/* Program DMA buffer address to hardware */
+	/* Based on Ghidra analysis: 0x10300 and 0x10304 are buffer registers */
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		/* Write buffer address (lower 32 bits) */
+		writel((u32)(dma_addr & 0xffffffff), chip->iobase + QUANTUM_REG_BUFFER0);
+		/* Write buffer address (upper 32 bits if 64-bit) */
+		/* Note: May need adjustment based on actual hardware */
+	} else {
+		/* Capture buffer */
+		writel((u32)(dma_addr & 0xffffffff), chip->iobase + QUANTUM_REG_BUFFER1);
+	}
+
+	/* Read initial status registers (from Ghidra: reads 0x0, 0x4, 0x8, 0x10, 0x14, 0x104) */
+	val = readl(chip->iobase + QUANTUM_REG_VERSION);
+	dev_dbg(&chip->pci->dev, "Version reg (0x%04x): 0x%08x\n", QUANTUM_REG_VERSION, val);
+	
+	val = readl(chip->iobase + QUANTUM_REG_STATUS1);
+	dev_dbg(&chip->pci->dev, "Status1 (0x%04x): 0x%08x\n", QUANTUM_REG_STATUS1, val);
+	
+	val = readl(chip->iobase + QUANTUM_REG_STATUS5);
+	dev_dbg(&chip->pci->dev, "Status5 (0x%04x): 0x%08x\n", QUANTUM_REG_STATUS5, val);
+
+	/* Write control register (from Ghidra: 0x100 = 0x8) */
+	writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
+	dev_dbg(&chip->pci->dev, "Control reg (0x%04x) = 0x08\n", QUANTUM_REG_CONTROL);
+
+	if (dump_on_trigger) {
 		dev_info(&chip->pci->dev, "MMIO at prepare:");
 		for (i = 0; i < 64; i += 4)
 			dev_info(&chip->pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
 	}
+
 	return 0;
 }
 
@@ -195,23 +265,39 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	struct quantum_runtime *qr = substream->runtime->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	unsigned long period_msec;
+	u32 control_val;
 	int i;
 
 	if (!qr)
 		return -EINVAL;
+
+	if (!chip->iobase)
+		return -EIO;
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		if (dump_on_trigger && chip->iobase) {
+		if (dump_on_trigger) {
 			dev_info(&chip->pci->dev, "MMIO at trigger START:");
 			for (i = 0; i < 64; i += 4)
 				dev_info(&chip->pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
 		}
+
+		/* Start hardware stream */
+		/* Based on Ghidra: control register at 0x100 controls stream */
+		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
+		/* Set stream start bit (exact bit needs experimentation) */
+		/* For now, ensure control register is set */
+		writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
+		dev_dbg(&chip->pci->dev, "Started %s stream\n",
+			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture");
+
 		qr->running = true;
 		qr->position = 0;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			chip->playback_substream = substream;
 		else
 			chip->capture_substream = substream;
+
 		/* Use timer only if we didn't get an IRQ (fallback) */
 		if (!chip->irq_requested) {
 			period_msec = (runtime->period_size * 1000) / runtime->rate;
@@ -220,12 +306,24 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			mod_timer(&qr->timer, jiffies + msecs_to_jiffies(period_msec));
 		}
 		break;
+
 	case SNDRV_PCM_TRIGGER_STOP:
-		if (dump_on_trigger && chip->iobase) {
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		if (dump_on_trigger) {
 			dev_info(&chip->pci->dev, "MMIO at trigger STOP:");
 			for (i = 0; i < 64; i += 4)
 				dev_info(&chip->pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
 		}
+
+		/* Stop hardware stream */
+		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
+		/* Clear stream start bit */
+		/* For now, just clear control register */
+		writel(0x0, chip->iobase + QUANTUM_REG_CONTROL);
+		dev_dbg(&chip->pci->dev, "Stopped %s stream\n",
+			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture");
+
 		qr->running = false;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			chip->playback_substream = NULL;
@@ -233,6 +331,21 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			chip->capture_substream = NULL;
 		timer_delete_sync(&qr->timer);
 		break;
+
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		/* Resume stream - same as START */
+		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
+		writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
+		qr->running = true;
+		if (!chip->irq_requested) {
+			period_msec = (runtime->period_size * 1000) / runtime->rate;
+			if (period_msec < 1)
+				period_msec = 1;
+			mod_timer(&qr->timer, jiffies + msecs_to_jiffies(period_msec));
+		}
+		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -241,15 +354,34 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 
 static snd_pcm_uframes_t quantum_pcm_pointer(struct snd_pcm_substream *substream)
 {
+	struct quantum_chip *chip = substream->pcm->private_data;
 	struct quantum_runtime *qr = substream->runtime->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
 	unsigned long flags;
 	snd_pcm_uframes_t pos = 0;
+	u32 hw_pos;
 
-	if (qr) {
+	if (!qr)
+		return 0;
+
+	/* Try to read hardware position from MMIO */
+	/* Based on Ghidra: status registers may contain position info */
+	if (chip->iobase) {
+		/* Read status register that might contain position */
+		/* This is a guess - actual position register needs experimentation */
+		hw_pos = readl(chip->iobase + QUANTUM_REG_STATUS5);
+		
+		/* If hardware position is available, use it */
+		/* For now, fall back to software position */
+		spin_lock_irqsave(&qr->lock, flags);
+		pos = qr->position;
+		spin_unlock_irqrestore(&qr->lock, flags);
+	} else {
 		spin_lock_irqsave(&qr->lock, flags);
 		pos = qr->position;
 		spin_unlock_irqrestore(&qr->lock, flags);
 	}
+
 	return pos;
 }
 
@@ -305,8 +437,27 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 	struct quantum_runtime *qr;
 	unsigned long flags;
 	snd_pcm_uframes_t period_frames, buf_frames;
+	u32 status;
 	irqreturn_t handled = IRQ_NONE;
 
+	if (!chip->iobase)
+		return IRQ_NONE;
+
+	/* Read interrupt status register */
+	/* Based on Ghidra: status registers at 0x4, 0x8, 0x10, 0x14, 0x104 */
+	/* Check which one is the interrupt status (needs experimentation) */
+	status = readl(chip->iobase + QUANTUM_REG_STATUS1);
+	
+	/* If no interrupt pending, return */
+	/* For now, assume any non-zero status means interrupt */
+	if (status == 0)
+		return IRQ_NONE;
+
+	/* Acknowledge interrupt (write to status register to clear) */
+	/* Exact acknowledgment method needs experimentation */
+	writel(status, chip->iobase + QUANTUM_REG_STATUS1);
+
+	/* Handle playback */
 	s = chip->playback_substream;
 	if (s && snd_pcm_running(s)) {
 		qr = s->runtime->private_data;
@@ -322,6 +473,8 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 			handled = IRQ_HANDLED;
 		}
 	}
+
+	/* Handle capture */
 	s = chip->capture_substream;
 	if (s && snd_pcm_running(s)) {
 		qr = s->runtime->private_data;
@@ -337,6 +490,7 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 			handled = IRQ_HANDLED;
 		}
 	}
+
 	return handled;
 }
 
@@ -355,6 +509,10 @@ static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 	chip->msi_allocated = false;
 	chip->playback_substream = NULL;
 	chip->capture_substream = NULL;
+	chip->playback_dma_addr = 0;
+	chip->capture_dma_addr = 0;
+	chip->playback_buffer_size = 0;
+	chip->capture_buffer_size = 0;
 
 	err = pci_enable_device(pci);
 	if (err < 0)
