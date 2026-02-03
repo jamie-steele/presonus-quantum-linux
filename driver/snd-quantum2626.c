@@ -229,11 +229,14 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		/* Write buffer address (lower 32 bits) */
 		writel((u32)(dma_addr & 0xffffffff), chip->iobase + QUANTUM_REG_BUFFER0);
-		/* Write buffer address (upper 32 bits if 64-bit) */
-		/* Note: May need adjustment based on actual hardware */
+		dev_info(&chip->pci->dev, "prepare playback: dma_addr=0x%llx buffer_size=%zu -> 0x%x\n",
+			 (unsigned long long)dma_addr, buffer_size, (u32)(dma_addr & 0xffffffff));
+		/* Note: May need upper 32 bits or buffer size register */
 	} else {
 		/* Capture buffer */
 		writel((u32)(dma_addr & 0xffffffff), chip->iobase + QUANTUM_REG_BUFFER1);
+		dev_info(&chip->pci->dev, "prepare capture: dma_addr=0x%llx buffer_size=%zu -> 0x%x\n",
+			 (unsigned long long)dma_addr, buffer_size, (u32)(dma_addr & 0xffffffff));
 	}
 
 	/* Read initial status registers (from Ghidra: reads 0x0, 0x4, 0x8, 0x10, 0x14, 0x104) */
@@ -248,7 +251,8 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 
 	/* Write control register (from Ghidra: 0x100 = 0x8) */
 	writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
-	dev_dbg(&chip->pci->dev, "Control reg (0x%04x) = 0x08\n", QUANTUM_REG_CONTROL);
+	dev_info(&chip->pci->dev, "prepare: CONTROL 0x100 = 0x8 (rate=%u format=%u)\n",
+		 runtime->rate, (unsigned int)snd_pcm_format_width(runtime->format));
 
 	if (dump_on_trigger) {
 		dev_info(&chip->pci->dev, "MMIO at prepare:");
@@ -283,13 +287,11 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		}
 
 		/* Start hardware stream */
-		/* Based on Ghidra: control register at 0x100 controls stream */
 		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
-		/* Set stream start bit (exact bit needs experimentation) */
-		/* For now, ensure control register is set */
 		writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
-		dev_dbg(&chip->pci->dev, "Started %s stream\n",
-			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture");
+		dev_info(&chip->pci->dev, "trigger START %s: CONTROL 0x100 was 0x%x now 0x8\n",
+			 substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture",
+			 control_val);
 
 		qr->running = true;
 		qr->position = 0;
@@ -318,11 +320,10 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 
 		/* Stop hardware stream */
 		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
-		/* Clear stream start bit */
-		/* For now, just clear control register */
 		writel(0x0, chip->iobase + QUANTUM_REG_CONTROL);
-		dev_dbg(&chip->pci->dev, "Stopped %s stream\n",
-			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture");
+		dev_info(&chip->pci->dev, "trigger STOP %s: CONTROL 0x100 was 0x%x now 0x0\n",
+			 substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture",
+			 control_val);
 
 		qr->running = false;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
