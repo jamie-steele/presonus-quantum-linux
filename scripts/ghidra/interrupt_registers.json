@@ -1,0 +1,12 @@
+{
+  "interrupt_handlers": [],
+  "interrupt_registers": {
+    "status": [],
+    "ack": []
+  },
+  "summary": {
+    "handlers_found": 0,
+    "status_registers": 0,
+    "ack_registers": 0
+  }
+}

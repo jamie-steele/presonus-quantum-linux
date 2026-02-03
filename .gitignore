@@ -53,3 +53,8 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Large trace files (exceed GitHub 100MB limit)
+*.etl
+scripts/trace_analysis/*.csv
+trace_analysis/*.csv

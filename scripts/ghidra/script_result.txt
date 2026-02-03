@@ -1,0 +1,10 @@
+﻿python : C:\Users\Jamie\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\LocalCache\local-packa
+ges\Python39\site-packages\pyghidra\__main__.py:283: DeprecationWarning: run_script() is deprecated, use 
+open_project() and ghidra_script() instead.
+At C:\Users\Jamie\AppData\Local\Temp\ps-script-beaf15bb-aeab-4084-8034-a1d744d84f54.ps1:93 char:312
++ ... ; $result = python -m pyghidra $driverFile find_mmio_registers.py 2>& ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\Jamie\...ript() instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  parser.parse_args(namespace=PyGhidraArgs(parser)).func()

@@ -49,6 +49,23 @@ static bool dump_on_trigger;
 module_param(dump_on_trigger, bool, 0444);
 MODULE_PARM_DESC(dump_on_trigger, "Dump MMIO at prepare/trigger for reverse-engineering (default off).");
 
+/* Register access for reverse engineering */
+static int reg_read_offset = -1;
+module_param(reg_read_offset, int, 0644);
+MODULE_PARM_DESC(reg_read_offset, "MMIO offset to read (hex, -1 to disable). Result in dmesg.");
+
+static int reg_write_offset = -1;
+module_param(reg_write_offset, int, 0644);
+MODULE_PARM_DESC(reg_write_offset, "MMIO offset to write (hex, -1 to disable).");
+
+static int reg_write_value = 0;
+module_param(reg_write_value, int, 0644);
+MODULE_PARM_DESC(reg_write_value, "Value to write to reg_write_offset (hex).");
+
+static bool reg_scan;
+module_param(reg_scan, bool, 0644);
+MODULE_PARM_DESC(reg_scan, "Scan and dump first 256 bytes of MMIO (0x00-0xff).");
+
 MODULE_AUTHOR("Quantum2626 Linux driver project");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("PreSonus Quantum 2626 (and family) ALSA PCI driver (skeleton)");
@@ -363,6 +380,29 @@ static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 	/* Log first 64 bytes of BAR 0 for reverse-engineering (word-aligned) */
 	for (i = 0; i < 64; i += 4)
 		dev_info(&pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
+
+	/* Register access for reverse engineering */
+	if (reg_scan) {
+		dev_info(&pci->dev, "=== MMIO Scan (0x00-0xff) ===");
+		for (i = 0; i < 256; i += 4)
+			dev_info(&pci->dev, "MMIO+0x%02x: 0x%08x", i, readl(chip->iobase + i));
+		reg_scan = false; /* Clear after one scan */
+	}
+
+	if (reg_read_offset >= 0 && reg_read_offset < (1024 * 1024)) {
+		u32 val = readl(chip->iobase + reg_read_offset);
+		dev_info(&pci->dev, "MMIO+0x%03x READ: 0x%08x", reg_read_offset, val);
+		reg_read_offset = -1; /* Clear after read */
+	}
+
+	if (reg_write_offset >= 0 && reg_write_offset < (1024 * 1024)) {
+		writel(reg_write_value, chip->iobase + reg_write_offset);
+		dev_info(&pci->dev, "MMIO+0x%03x WRITE: 0x%08x (old: 0x%08x)",
+			 reg_write_offset, reg_write_value,
+			 readl(chip->iobase + reg_write_offset));
+		reg_write_offset = -1; /* Clear after write */
+		reg_write_value = 0;
+	}
 
 	/* Prefer MSI (Thunderbolt PCIe often has legacy IRQ 0); fall back to legacy if valid */
 	if (pci_alloc_irq_vectors(pci, 1, 1, PCI_IRQ_MSI) == 1) {
