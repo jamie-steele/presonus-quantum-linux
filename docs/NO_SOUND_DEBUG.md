@@ -42,7 +42,11 @@ sudo dmesg | grep -E "MMIO|prepare|trigger" | tail -80 > notes/MMIO_during_playb
 
 Compare with `notes/MMIO_BASELINE.md` to see which registers change when we start/stop.
 
-## 4. Next RE steps
+## 4. Optional register params (test without recompile)
+
+When you find sample rate, buffer size, or format register offsets (Ghidra or Windows capture), program them via module params: `reg_srate_offset` / `reg_srate_value`, `reg_bufsize_offset`, `reg_fmt_offset` / `reg_fmt_value` (default -1 = disabled, offsets in hex). Example: `sudo modprobe snd-quantum2626 reg_srate_offset=0x108 reg_srate_value=48000`. See driver source and notes/GHIDRA_FINDINGS_SUMMARY.md.
+
+## 5. Next RE steps
 
 - In Ghidra: find where the Windows driver **writes** buffer address, buffer size, sample rate, and stream start/stop. Confirm offsets and values.
 - Update `notes/REGISTER_GUESSES.md` and the driver’s `QUANTUM_REG_*` defines accordingly.

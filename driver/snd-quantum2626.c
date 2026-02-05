@@ -66,11 +66,38 @@ static bool reg_scan;
 module_param(reg_scan, bool, 0644);
 MODULE_PARM_DESC(reg_scan, "Scan and dump first 256 bytes of MMIO (0x00-0xff).");
 
+/* Optional: program these when offset discovered (Ghidra / Windows capture). -1 = disabled. */
+static int reg_srate_offset = -1;
+module_param(reg_srate_offset, int, 0644);
+MODULE_PARM_DESC(reg_srate_offset, "MMIO offset for sample rate (hex, -1 disabled). Set with reg_srate_value.");
+static int reg_srate_value = 48000;
+module_param(reg_srate_value, int, 0644);
+MODULE_PARM_DESC(reg_srate_value, "Value to write to sample rate register (e.g. 48000 or divisor).");
+
+static int reg_bufsize_offset = -1;
+module_param(reg_bufsize_offset, int, 0644);
+MODULE_PARM_DESC(reg_bufsize_offset, "MMIO offset for buffer size in bytes (hex, -1 disabled).");
+
+static int reg_fmt_offset = -1;
+module_param(reg_fmt_offset, int, 0644);
+MODULE_PARM_DESC(reg_fmt_offset, "MMIO offset for format (hex, -1 disabled).");
+static int reg_fmt_value = 0;
+module_param(reg_fmt_value, int, 0644);
+MODULE_PARM_DESC(reg_fmt_value, "Value to write to format register (bit depth / channels encoding).");
+
+/* Override value written to CONTROL 0x100 on stream start. -1 = use default 0x8 (from Ghidra). */
+static int control_value = -1;
+module_param(control_value, int, 0644);
+MODULE_PARM_DESC(control_value, "Value for CONTROL 0x100 on start (-1 = 0x8). Try 0x88, 0x9, etc. if no sound.");
+
 MODULE_AUTHOR("Quantum2626 Linux driver project");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("PreSonus Quantum 2626 (and family) ALSA PCI driver (skeleton)");
 
-/* Register offsets (from Ghidra analysis) */
+/*
+ * Register map from notes/GHIDRA_FINDINGS_SUMMARY.md and REGISTER_GUESSES.md.
+ * Still missing (set via module params when found): sample rate reg, format reg, buffer size reg.
+ */
 #define QUANTUM_REG_VERSION	0x0000	/* Version/ID register */
 #define QUANTUM_REG_STATUS1	0x0004	/* Status/Control */
 #define QUANTUM_REG_STATUS2	0x0008	/* Status/Control */
@@ -249,10 +276,30 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 	val = readl(chip->iobase + QUANTUM_REG_STATUS5);
 	dev_dbg(&chip->pci->dev, "Status5 (0x%04x): 0x%08x\n", QUANTUM_REG_STATUS5, val);
 
-	/* Write control register (from Ghidra: 0x100 = 0x8) */
-	writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
-	dev_info(&chip->pci->dev, "prepare: CONTROL 0x100 = 0x8 (rate=%u format=%u)\n",
-		 runtime->rate, (unsigned int)snd_pcm_format_width(runtime->format));
+	/* Write control register (from Ghidra: 0x100 = 0x8; overridable via control_value) */
+	{
+		u32 ctrl = (control_value >= 0) ? (u32)control_value : 0x8u;
+		writel(ctrl, chip->iobase + QUANTUM_REG_CONTROL);
+		dev_info(&chip->pci->dev, "prepare: CONTROL 0x100 = 0x%x (rate=%u format=%u)\n",
+			 ctrl, runtime->rate, (unsigned int)snd_pcm_format_width(runtime->format));
+	}
+
+	/* Optional: program when offset found via Ghidra / Windows capture */
+	if (reg_srate_offset >= 0) {
+		writel((u32)reg_srate_value, chip->iobase + reg_srate_offset);
+		dev_info(&chip->pci->dev, "prepare: sample rate reg 0x%x = 0x%x\n",
+			 reg_srate_offset, (u32)reg_srate_value);
+	}
+	if (reg_bufsize_offset >= 0) {
+		writel((u32)buffer_size, chip->iobase + reg_bufsize_offset);
+		dev_info(&chip->pci->dev, "prepare: buffer size reg 0x%x = %zu\n",
+			 reg_bufsize_offset, buffer_size);
+	}
+	if (reg_fmt_offset >= 0) {
+		writel((u32)reg_fmt_value, chip->iobase + reg_fmt_offset);
+		dev_info(&chip->pci->dev, "prepare: format reg 0x%x = 0x%x\n",
+			 reg_fmt_offset, (u32)reg_fmt_value);
+	}
 
 	if (dump_on_trigger) {
 		dev_info(&chip->pci->dev, "MMIO at prepare:");
@@ -287,11 +334,14 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		}
 
 		/* Start hardware stream */
-		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
-		writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
-		dev_info(&chip->pci->dev, "trigger START %s: CONTROL 0x100 was 0x%x now 0x8\n",
-			 substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture",
-			 control_val);
+		{
+			u32 ctrl = (control_value >= 0) ? (u32)control_value : 0x8u;
+			control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
+			writel(ctrl, chip->iobase + QUANTUM_REG_CONTROL);
+			dev_info(&chip->pci->dev, "trigger START %s: CONTROL 0x100 was 0x%x now 0x%x\n",
+				 substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture",
+				 control_val, ctrl);
+		}
 
 		qr->running = true;
 		qr->position = 0;
@@ -336,8 +386,11 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Resume stream - same as START */
-		control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
-		writel(0x8, chip->iobase + QUANTUM_REG_CONTROL);
+		{
+			u32 ctrl = (control_value >= 0) ? (u32)control_value : 0x8u;
+			control_val = readl(chip->iobase + QUANTUM_REG_CONTROL);
+			writel(ctrl, chip->iobase + QUANTUM_REG_CONTROL);
+		}
 		qr->running = true;
 		if (!chip->irq_requested) {
 			period_msec = (runtime->period_size * 1000) / runtime->rate;

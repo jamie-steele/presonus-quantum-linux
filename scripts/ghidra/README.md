@@ -46,6 +46,18 @@ analyzeHeadless <project_path> <project_name> -process pae_quantum.sys -script f
 
 **Usage:** Same as above
 
+### 4. `trace_stream_start_writes.py` (fast driver iteration)
+**Purpose:** List every MMIO write on the stream-start path so you can mirror it in the Linux driver.
+
+**What it does:**
+- Finds `FUN_140002e30` (control 0x100 = 0x8) and every function that calls it
+- In those functions, lists every write to `[base+offset]` in instruction order, with immediate value if present
+- Writes `stream_start_writes.txt` (one line per write: `0xOFFSET 0xVAL` or `0xOFFSET ?`) and `stream_start_writes_detail.txt` (with function and address)
+
+**Usage:** Run in Ghidra GUI (Scripts > Run Script) or headless with `-postScript trace_stream_start_writes.py`. Output appears in the script directory.
+
+**Use for Linux:** Paste the ordered list into the driver’s prepare/trigger path, or try unknown offsets/values via module params (`reg_write_offset`, `reg_write_value`, etc.).
+
 ## Quick Start
 
 ### Option 1: Run in Ghidra GUI
@@ -57,7 +69,28 @@ analyzeHeadless <project_path> <project_name> -process pae_quantum.sys -script f
 5. Select one of the scripts
 6. Review output in console
 
-### Option 2: Run Headless (Windows)
+### Option 2: Run on Linux (recommended for single workflow)
+
+From the repo root:
+
+```bash
+# One-time setup: install Java, download and unpack Ghidra to tools/ghidra
+./scripts/setup_ghidra_linux.sh
+
+# Put the Windows driver binary in the repo (copy from Windows or DriverStore)
+cp /path/to/pae_quantum.sys driver-reference/
+
+# Run headless analysis (default: trace_stream_start_writes.py)
+./scripts/run_ghidra_analysis.sh
+
+# Run a specific script
+./scripts/run_ghidra_analysis.sh find_mmio_registers.py
+./scripts/run_ghidra_analysis.sh trace_stream_start_writes.py
+```
+
+Optional env vars: `GHIDRA_INSTALL_DIR`, `DRIVER_BIN`, `GHIDRA_PROJECT_DIR`, `GHIDRA_PROJECT_NAME`.
+
+### Option 3: Run Headless (Windows)
 
 ```powershell
 # Set paths
@@ -74,7 +107,7 @@ $projectName = "Quantum2626_Driver"
     -postScript find_mmio_registers.py
 ```
 
-### Option 3: Run All Scripts
+### Option 4: Run All Scripts
 
 ```powershell
 cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts\ghidra

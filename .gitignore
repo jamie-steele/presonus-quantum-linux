@@ -58,3 +58,12 @@ dkms.conf
 *.etl
 scripts/trace_analysis/*.csv
 trace_analysis/*.csv
+
+# Ghidra install and projects (scripts/setup_ghidra_linux.sh)
+tools/
+
+# driver-reference: copyrighted PreSonus/Windows files only (not .txt, etc.)
+driver-reference/pae_quantum.sys
+driver-reference/pae_quantum.inf
+driver-reference/pae_quantum.cat
+driver-reference/pae_quantum.PNF
