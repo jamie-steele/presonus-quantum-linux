@@ -1,0 +1,235 @@
+=== Comprehensive Register Map - pae_quantum.sys ===
+
+Generated: 2026-02-05 06:20:51
+
+=== Summary ===
+Total unique register offsets: 14
+Functions using MMIO: 75
+Sample rate usages found: 0
+
+=== Register Accesses (sorted by offset) ===
+
+Offset 0x0004 (4 decimal):
+  Total accesses: 4
+  Reads: 2, Writes: 0
+  Functions: FUN_140005770, FUN_14000d050, FUN_140004ee0, FUN_140020300
+
+  READ: CMP dword ptr [RBP + -0x4],0x4 in FUN_140004ee0
+  READ: MOV R10D,dword ptr [RAX + RCX*0x4 + -0x4] in FUN_140005770
+  UNKNOWN: LEA RDX,[RDX + -0x4] in FUN_14000d050
+  UNKNOWN: LEA R9,[R8 + RCX*0x1 + -0x4] in FUN_140020300
+
+Offset 0x0008 (8 decimal):
+  Total accesses: 17
+  Reads: 9, Writes: 0
+  Functions: FUN_140019190, FUN_140008a40, FUN_140003d60, FUN_14001c5f0, FUN_1400104b0, FUN_14001c610, FUN_14000d1b0, FUN_14000cc80, FUN_140007cf0, FUN_1400197f0, FUN_140020040, FUN_140019030, FUN_14001c630, FUN_14000f2d0, FUN_140004ee0, FUN_14000f830
+
+  READ: MOV qword ptr [RBP + -0x8],0x8 in FUN_140003d60
+  UNKNOWN: LEA R9,[RBP + -0x8] in FUN_140004ee0
+  READ: MOV qword ptr [RBP + -0x8],0x8 in FUN_140007cf0
+  UNKNOWN: LEA RAX,[RCX + -0x8] in FUN_140008a40
+  READ: MOV qword ptr [RBP + -0x8],0x8 in FUN_14000cc80
+  ... and 12 more
+
+Offset 0x000c (12 decimal):
+  Total accesses: 2
+  Reads: 2, Writes: 0
+  Functions: FUN_140019190, FUN_140003d60
+
+  READ: MOV word ptr [RBP + -0x12],R15W in FUN_140003d60
+  READ: MOV dword ptr [RBP + -0xc],0x201 in FUN_140019190
+
+Offset 0x0010 (16 decimal):
+  Total accesses: 1
+  Reads: 1, Writes: 0
+  Functions: FUN_140003d60
+
+  READ: MOV dword ptr [RBP + -0x16],R15D in FUN_140003d60
+
+Offset 0x0014 (20 decimal):
+  Total accesses: 20
+  Reads: 15, Writes: 0
+  Functions: FUN_140019190, FUN_1400094d0, FUN_14001f150, FUN_14000cc80, FUN_1400118e0, FUN_14001f400, FUN_140007cf0, FUN_140018d90, FUN_1400164d0, FUN_140014960, FUN_14001fb38, FUN_14001b340, FUN_140016b30, FUN_140016f20, FUN_14000f2d0
+
+  READ: MOV qword ptr [RBP + -0x20],RAX in FUN_140007cf0
+  UNKNOWN: LEA RAX,[RBP + -0x20] in FUN_140007cf0
+  READ: MOV qword ptr [RAX + -0x20],R14 in FUN_1400094d0
+  READ: MOV qword ptr [RBP + -0x20],RAX in FUN_14000cc80
+  UNKNOWN: LEA RAX,[RBP + -0x20] in FUN_14000cc80
+  ... and 15 more
+
+Offset 0x0018 (24 decimal):
+  Total accesses: 3
+  Reads: 3, Writes: 0
+  Functions: FUN_140019190
+
+  READ: MOV dword ptr [RBP + -0x24],ECX in FUN_140019190
+  READ: MOV dword ptr [RBP + -0x24],EAX in FUN_140019190
+  READ: MOV dword ptr [RBP + -0x24],0x201 in FUN_140019190
+
+Offset 0x001c (28 decimal):
+  Total accesses: 18
+  Reads: 17, Writes: 0
+  Functions: FUN_140019190, FUN_1400094d0, FUN_140003d60, FUN_14000cc80, FUN_14001f400, FUN_140003b60, FUN_1400164d0, FUN_14001fb38, FUN_14001b340, FUN_140016b30, FUN_140016f20, FUN_14000f2d0
+
+  READ: MOV qword ptr [R11 + -0x28],RAX in FUN_140003b60
+  READ: MOV qword ptr [RDX + -0x28],R15 in FUN_140003d60
+  READ: MOV qword ptr [RAX + -0x28],R15 in FUN_1400094d0
+  READ: MOV qword ptr [RBP + -0x28],RAX in FUN_14000cc80
+  UNKNOWN: LEA RAX,[RBP + -0x28] in FUN_14000cc80
+  ... and 13 more
+
+Offset 0x0028 (40 decimal):
+  Total accesses: 14
+  Reads: 3, Writes: 0
+  Functions: FUN_140003d60, FUN_14000c5e0, FUN_140014960, FUN_140016f20
+
+  READ: MOV qword ptr [RDX + -0x40],RAX in FUN_140003d60
+  READ: MOV qword ptr [RBP + -0x40],R14 in FUN_140003d60
+  READ: MOV qword ptr [R11 + -0x40],0x4 in FUN_14000c5e0
+  UNKNOWN: LEA RAX,[RBP + -0x40] in FUN_140014960
+  UNKNOWN: LEA R8,[RBP + -0x40] in FUN_140014960
+  ... and 9 more
+
+Offset 0x002c (44 decimal):
+  Total accesses: 6
+  Reads: 6, Writes: 0
+  Functions: FUN_14000cc80
+
+  READ: MOV dword ptr [RBP + -0x2c],0x2 in FUN_14000cc80
+  READ: MOV dword ptr [RBP + -0x2c],0x1 in FUN_14000cc80
+  READ: MOV dword ptr [RBP + -0x2c],0x3 in FUN_14000cc80
+  READ: MOV dword ptr [RBP + -0x2c],0x6 in FUN_14000cc80
+  READ: MOV dword ptr [RBP + -0x2c],0x5 in FUN_14000cc80
+  ... and 1 more
+
+Offset 0x0030 (48 decimal):
+  Total accesses: 6
+  Reads: 3, Writes: 0
+  Functions: FUN_140003d60, FUN_140003b60, FUN_14000c5e0, FUN_140004ee0
+
+  READ: MOV qword ptr [R11 + -0x48],RAX in FUN_140003b60
+  READ: MOV qword ptr [RBP + -0x48],RAX in FUN_140003d60
+  UNKNOWN: LEA RCX,[RBP + -0x48] in FUN_140004ee0
+  UNKNOWN: LEA RDX,[RBP + -0x48] in FUN_140004ee0
+  READ: MOV qword ptr [R11 + -0x48],RAX in FUN_14000c5e0
+  ... and 1 more
+
+Offset 0x003c (60 decimal):
+  Total accesses: 4
+  Reads: 3, Writes: 0
+  Functions: FUN_140003d60, FUN_14000c9b0
+
+  UNKNOWN: LEA RCX,[RBP + -0x60] in FUN_140003d60
+  READ: MOV qword ptr [RBP + -0x60],0x3 in FUN_140003d60
+  READ: CMP dword ptr [RBP + -0x60],0x3 in FUN_140003d60
+  READ: MOV qword ptr [R11 + -0x60],0x20 in FUN_14000c9b0
+
+Offset 0x0044 (68 decimal):
+  Total accesses: 8
+  Reads: 3, Writes: 0
+  Functions: FUN_140003d60, FUN_140003b60, FUN_140014960, FUN_14000c9b0, FUN_140004ee0
+
+  READ: MOV qword ptr [R11 + -0x68],R10 in FUN_140003b60
+  READ: MOV qword ptr [RBP + -0x68],0x4 in FUN_140003d60
+  UNKNOWN: LEA RCX,[RBP + -0x68] in FUN_140004ee0
+  UNKNOWN: LEA RDX,[RBP + -0x68] in FUN_140004ee0
+  READ: MOV qword ptr [R11 + -0x68],RBX in FUN_14000c9b0
+  ... and 3 more
+
+Offset 0x0050 (80 decimal):
+  Total accesses: 4
+  Reads: 2, Writes: 0
+  Functions: FUN_140003d60, FUN_140004ee0
+
+  UNKNOWN: LEA RCX,[RBP + -0x80] in FUN_140003d60
+  READ: MOV qword ptr [RBP + -0x80],R15 in FUN_140003d60
+  READ: MOV RDX,qword ptr [RBP + -0x80] in FUN_140003d60
+  UNKNOWN: LEA RBP,[RSP + -0x80] in FUN_140004ee0
+
+Offset 0x00a8 (168 decimal):
+  Total accesses: 2
+  Reads: 0, Writes: 0
+  Functions: FUN_140001e60, FUN_140001db0
+
+  UNKNOWN: LEA RBX,[RAX + -0xa8] in FUN_140001db0
+  UNKNOWN: LEA RCX,[RAX + -0xa8] in FUN_140001e60
+
+
+=== Functions Using MMIO ===
+
+  FUN_140001db0
+  FUN_140001e60
+  FUN_140002e30
+  FUN_140003b60
+  FUN_140003d60
+  FUN_140004ee0
+  FUN_140005770
+  FUN_140007cf0
+  FUN_140008490
+  FUN_140008a40
+  FUN_140008c90
+  FUN_140008fb0
+  FUN_1400094d0
+  FUN_140009dc0
+  FUN_14000a0b0
+  FUN_14000a230
+  FUN_14000a6f0
+  FUN_14000ab90
+  FUN_14000b1e0
+  FUN_14000b900
+  FUN_14000b9a0
+  FUN_14000c5e0
+  FUN_14000c9b0
+  FUN_14000cc80
+  FUN_14000d050
+  FUN_14000d1b0
+  FUN_14000e640
+  FUN_14000e970
+  FUN_14000ecb0
+  FUN_14000ee50
+  FUN_14000ef10
+  FUN_14000f2d0
+  FUN_14000f830
+  FUN_14000faf0
+  FUN_1400104b0
+  FUN_140011570
+  FUN_1400118a0
+  FUN_1400118e0
+  FUN_140012090
+  FUN_140012690
+  FUN_140012770
+  FUN_140012820
+  FUN_140012890
+  FUN_140012a80
+  FUN_140012f70
+  FUN_1400133a0
+  FUN_140013700
+  FUN_140013ba0
+  FUN_140014060
+  FUN_140014220
+  FUN_140014960
+  FUN_140015780
+  FUN_1400164d0
+  FUN_140016b30
+  FUN_140016f20
+  FUN_1400176d0
+  FUN_140017890
+  FUN_140018190
+  FUN_140018d90
+  FUN_140018ef0
+  FUN_140019030
+  FUN_140019190
+  FUN_1400197f0
+  FUN_14001a660
+  FUN_14001b340
+  FUN_14001c5f0
+  FUN_14001c610
+  FUN_14001c630
+  FUN_14001dd60
+  FUN_14001dfd0
+  FUN_14001f150
+  FUN_14001f400
+  FUN_14001fb38
+  FUN_140020040
+  FUN_140020300

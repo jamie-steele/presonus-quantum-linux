@@ -1,0 +1,19 @@
+=== Function Analysis ===
+
+Generated: 2026-02-05 06:30:08
+
+=== FUN_140002e30 ===
+Address: 140002e30
+
+No register accesses found
+
+=== FUN_140003d60 ===
+Address: 140003d60
+
+No register accesses found
+
+=== FUN_14000d410 ===
+Address: 14000d410
+
+No register accesses found
+

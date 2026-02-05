@@ -30,6 +30,16 @@ make install
 sudo modprobe snd-quantum2626
 ```
 
+**For testing with debug output:**
+```bash
+sudo insmod snd-quantum2626.ko dump_on_trigger=1
+```
+
+**Quick status check:**
+```bash
+../scripts/linux_test_driver.sh
+```
+
 Check:
 
 ```bash

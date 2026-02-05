@@ -1,0 +1,9 @@
+=== Register Offset Scalar Search ===
+
+Generated: 2026-02-05 06:43:53
+
+=== Summary ===
+Found 0 offsets with register access
+
+=== Register Map ===
+

@@ -539,6 +539,15 @@ static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 	/* Log first 64 bytes of BAR 0 for reverse-engineering (word-aligned) */
 	for (i = 0; i < 64; i += 4)
 		dev_info(&pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
+	
+	/* Read status registers to check device initialization
+	 * Note: Blue LED should be solid when device is properly initialized
+	 * Register 0x04 (STATUS1) may indicate device ready state
+	 */
+	dev_info(&pci->dev, "Device status check (LED should be solid if initialized):\n");
+	dev_info(&pci->dev, "  Version (0x00): 0x%08x\n", readl(chip->iobase + QUANTUM_REG_VERSION));
+	dev_info(&pci->dev, "  Status1 (0x04): 0x%08x\n", readl(chip->iobase + QUANTUM_REG_STATUS1));
+	dev_info(&pci->dev, "  Status2 (0x08): 0x%08x\n", readl(chip->iobase + QUANTUM_REG_STATUS2));
 
 	/* Register access for reverse engineering */
 	if (reg_scan) {

@@ -1,0 +1,9 @@
+=== Enhanced MMIO Register Map ===
+
+Generated: 2026-02-05 06:21:47
+
+=== Summary ===
+Total unique register offsets: 0
+
+=== Register Map (sorted by offset) ===
+

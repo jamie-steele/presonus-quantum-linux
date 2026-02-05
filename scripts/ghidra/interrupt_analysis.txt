@@ -1,0 +1,13 @@
+=== Interrupt Handler Analysis ===
+
+Generated: 2026-02-05 06:29:31
+
+=== IoConnectInterruptEx Calls ===
+
+Called from: UNKNOWN at 1400210d0
+
+Called from: FUN_140003d60 at 1400044fa
+
+
+=== Interrupt Register Candidates ===
+
