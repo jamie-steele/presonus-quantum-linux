@@ -13,20 +13,24 @@ echo "Install dir: $INSTALL_DIR"
 echo ""
 
 # --- Java ---
-echo "Checking Java (Ghidra needs Java 17 or 21)..."
-if command -v java >/dev/null 2>&1; then
+# Ghidra 12+ requires JDK 21. Prefer 21 so the headless launcher doesn't prompt.
+echo "Checking Java (Ghidra 12+ needs JDK 21; 11.x works with 17)..."
+if [ -d /usr/lib/jvm/java-21-openjdk-amd64 ] && [ -x /usr/lib/jvm/java-21-openjdk-amd64/bin/java ]; then
+  echo "  Found: JDK 21 at /usr/lib/jvm/java-21-openjdk-amd64"
+elif command -v java >/dev/null 2>&1; then
   VER=$(java -version 2>&1 | head -1)
   echo "  Found: $VER"
-  if java -version 2>&1 | grep -qE '"1[78]\.|"21\.'; then
-    echo "  OK (Java 17/18/21)"
+  if java -version 2>&1 | grep -q '"21\.'; then
+    echo "  OK (Java 21)"
   else
-    echo "  If headless fails, install: sudo apt install openjdk-17-jdk"
+    echo "  Ghidra 12+ needs JDK 21. Install: sudo apt install openjdk-21-jdk"
+    echo "  Then run this script again or set JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64"
   fi
 else
-  echo "  Java not found. Installing openjdk-17-jdk..."
+  echo "  Java not found. Installing openjdk-21-jdk (required for Ghidra 12+)..."
   sudo apt-get update -qq
-  sudo apt-get install -y openjdk-17-jdk
-  echo "  Done."
+  sudo apt-get install -y openjdk-21-jdk
+  echo "  Done. JDK 21 home: /usr/lib/jvm/java-21-openjdk-amd64"
 fi
 echo ""
 
@@ -38,6 +42,23 @@ if [ -f support/analyzeHeadless ] || [ -f */support/analyzeHeadless ]; then
   GHIDRA_ROOT=$(dirname "$(dirname "$(find . -name analyzeHeadless -path '*/support/analyzeHeadless' 2>/dev/null | head -1)")")
   echo "Ghidra already installed at: $INSTALL_DIR/$GHIDRA_ROOT"
   echo "  To reinstall, remove that folder and run this script again."
+  echo ""
+  VENV_DIR="$REPO/tools/ghidra_venv"
+  echo "Setting up PyGhidra in $VENV_DIR..."
+  export GHIDRA_INSTALL_DIR="$INSTALL_DIR/$GHIDRA_ROOT"
+  if [ -x "$VENV_DIR/bin/python3" ] && "$VENV_DIR/bin/python3" -c "import pyghidra" 2>/dev/null; then
+    echo "  PyGhidra venv already OK."
+  else
+    [ ! -x "$VENV_DIR/bin/python3" ] && python3 -m venv "$VENV_DIR" 2>/dev/null
+    [ ! -x "$VENV_DIR/bin/pip" ] && [ ! -x "$VENV_DIR/bin/pip3" ] && "$VENV_DIR/bin/python3" -m ensurepip --upgrade 2>/dev/null || true
+    if GHIDRA_INSTALL_DIR="$INSTALL_DIR/$GHIDRA_ROOT" "$VENV_DIR/bin/python3" -m pip install pyghidra; then
+      echo "  Installed PyGhidra in venv."
+    else
+      echo "  Pip install failed. Try manually:"
+      echo "    GHIDRA_INSTALL_DIR=$INSTALL_DIR/$GHIDRA_ROOT $VENV_DIR/bin/python3 -m pip install pyghidra"
+      exit 1
+    fi
+  fi
   echo ""
   echo "Next: put the Windows driver binary in the repo for analysis:"
   echo "  cp /path/to/pae_quantum.sys $DRIVER_REF/"
@@ -83,6 +104,36 @@ if [ -z "$GHIDRA_DIR" ]; then
   exit 1
 fi
 echo "  Installed: $GHIDRA_DIR"
+echo ""
+
+# --- PyGhidra (so Python scripts run in headless) ---
+VENV_DIR="$REPO/tools/ghidra_venv"
+echo "Setting up PyGhidra..."
+export GHIDRA_INSTALL_DIR="$GHIDRA_DIR"
+if [ -x "$VENV_DIR/bin/python3" ] && "$VENV_DIR/bin/python3" -c "import pyghidra" 2>/dev/null; then
+  echo "  PyGhidra venv already OK."
+else
+  # Create venv if missing
+  if [ ! -x "$VENV_DIR/bin/python3" ]; then
+    if ! python3 -m venv "$VENV_DIR" 2>/dev/null; then
+      echo "  ERROR: python3 -m venv failed. Install: sudo apt install python3.10-venv"
+      echo "  Then re-run this script."
+      exit 1
+    fi
+  fi
+  # Bootstrap pip if venv has no pip/pip3
+  if [ ! -x "$VENV_DIR/bin/pip" ] && [ ! -x "$VENV_DIR/bin/pip3" ]; then
+    echo "  Bootstrapping pip in venv..."
+    "$VENV_DIR/bin/python3" -m ensurepip --upgrade 2>/dev/null || true
+  fi
+  if GHIDRA_INSTALL_DIR="$GHIDRA_DIR" "$VENV_DIR/bin/python3" -m pip install pyghidra; then
+    echo "  Installed PyGhidra in $VENV_DIR"
+  else
+    echo "  Pip install failed. Try: GHIDRA_INSTALL_DIR=$GHIDRA_DIR $VENV_DIR/bin/python3 -m pip install pyghidra"
+    exit 1
+  fi
+  echo "  Run analysis with: ./scripts/run_ghidra_analysis.sh"
+fi
 echo ""
 
 # --- Driver binary reminder ---

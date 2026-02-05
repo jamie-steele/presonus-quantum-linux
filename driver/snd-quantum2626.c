@@ -18,6 +18,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/pcm.h>
@@ -72,7 +73,7 @@ module_param(reg_srate_offset, int, 0644);
 MODULE_PARM_DESC(reg_srate_offset, "MMIO offset for sample rate (hex, -1 disabled). Set with reg_srate_value.");
 static int reg_srate_value = 48000;
 module_param(reg_srate_value, int, 0644);
-MODULE_PARM_DESC(reg_srate_value, "Value to write to sample rate register (e.g. 48000 or divisor).");
+MODULE_PARM_DESC(reg_srate_value, "Value for sample rate reg (e.g. 48000). -1 = use runtime rate when offset set.");
 
 static int reg_bufsize_offset = -1;
 module_param(reg_bufsize_offset, int, 0644);
@@ -83,12 +84,30 @@ module_param(reg_fmt_offset, int, 0644);
 MODULE_PARM_DESC(reg_fmt_offset, "MMIO offset for format (hex, -1 disabled).");
 static int reg_fmt_value = 0;
 module_param(reg_fmt_value, int, 0644);
-MODULE_PARM_DESC(reg_fmt_value, "Value to write to format register (bit depth / channels encoding).");
+MODULE_PARM_DESC(reg_fmt_value, "Value for format reg. -1 = use runtime format width (bits) when offset set.");
 
 /* Override value written to CONTROL 0x100 on stream start. -1 = use default 0x8 (from Ghidra). */
 static int control_value = -1;
 module_param(control_value, int, 0644);
 MODULE_PARM_DESC(control_value, "Value for CONTROL 0x100 on start (-1 = 0x8). Try 0x88, 0x9, etc. if no sound.");
+
+/* Stream-start path also writes 0x8 and 0x10 (values unknown). Set >= 0 to try. */
+static int reg_status2_value = -1;
+module_param(reg_status2_value, int, 0644);
+MODULE_PARM_DESC(reg_status2_value, "If >= 0, write to STATUS2 0x8 on prepare (hex). -1 = don't write.");
+static int reg_status3_value = -1;
+module_param(reg_status3_value, int, 0644);
+MODULE_PARM_DESC(reg_status3_value, "If >= 0, write to STATUS3 0x10 on prepare (hex). -1 = don't write.");
+
+/* Run device init sequence at probe (reads + init writes). Needed for blue LED / audio. */
+static bool do_init_sequence = true;
+module_param(do_init_sequence, bool, 0644);
+MODULE_PARM_DESC(do_init_sequence, "Run init sequence at probe. Set 0 to disable.");
+
+/* Value for final CONTROL (0x100) write at init. -1 = use 0x8. Try 0x88, 0x10, 0x9 for LED. */
+static int init_control_value = -1;
+module_param(init_control_value, int, 0644);
+MODULE_PARM_DESC(init_control_value, "Init CONTROL 0x100 value (hex). -1 = 0x8. Try 0x88, 0x10 if LED blinks.");
 
 MODULE_AUTHOR("Quantum2626 Linux driver project");
 MODULE_LICENSE("GPL");
@@ -96,6 +115,7 @@ MODULE_DESCRIPTION("PreSonus Quantum 2626 (and family) ALSA PCI driver (skeleton
 
 /*
  * Register map from notes/GHIDRA_FINDINGS_SUMMARY.md and REGISTER_GUESSES.md.
+ * stream_start_writes.txt may be empty if Ghidra control function name differs; use these offsets.
  * Still missing (set via module params when found): sample rate reg, format reg, buffer size reg.
  */
 #define QUANTUM_REG_VERSION	0x0000	/* Version/ID register */
@@ -276,6 +296,16 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 	val = readl(chip->iobase + QUANTUM_REG_STATUS5);
 	dev_dbg(&chip->pci->dev, "Status5 (0x%04x): 0x%08x\n", QUANTUM_REG_STATUS5, val);
 
+	/* Optional: stream-start path writes to 0x8 and 0x10 (trace value unknown) */
+	if (reg_status2_value >= 0) {
+		writel((u32)reg_status2_value, chip->iobase + QUANTUM_REG_STATUS2);
+		dev_info(&chip->pci->dev, "prepare: STATUS2 0x8 = 0x%x\n", (u32)reg_status2_value);
+	}
+	if (reg_status3_value >= 0) {
+		writel((u32)reg_status3_value, chip->iobase + QUANTUM_REG_STATUS3);
+		dev_info(&chip->pci->dev, "prepare: STATUS3 0x10 = 0x%x\n", (u32)reg_status3_value);
+	}
+
 	/* Write control register (from Ghidra: 0x100 = 0x8; overridable via control_value) */
 	{
 		u32 ctrl = (control_value >= 0) ? (u32)control_value : 0x8u;
@@ -286,9 +316,10 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 
 	/* Optional: program when offset found via Ghidra / Windows capture */
 	if (reg_srate_offset >= 0) {
-		writel((u32)reg_srate_value, chip->iobase + reg_srate_offset);
-		dev_info(&chip->pci->dev, "prepare: sample rate reg 0x%x = 0x%x\n",
-			 reg_srate_offset, (u32)reg_srate_value);
+		u32 srate = (reg_srate_value >= 0) ? (u32)reg_srate_value : (u32)runtime->rate;
+		writel(srate, chip->iobase + reg_srate_offset);
+		dev_info(&chip->pci->dev, "prepare: sample rate reg 0x%x = %u\n",
+			 reg_srate_offset, srate);
 	}
 	if (reg_bufsize_offset >= 0) {
 		writel((u32)buffer_size, chip->iobase + reg_bufsize_offset);
@@ -296,9 +327,10 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 			 reg_bufsize_offset, buffer_size);
 	}
 	if (reg_fmt_offset >= 0) {
-		writel((u32)reg_fmt_value, chip->iobase + reg_fmt_offset);
-		dev_info(&chip->pci->dev, "prepare: format reg 0x%x = 0x%x\n",
-			 reg_fmt_offset, (u32)reg_fmt_value);
+		u32 fmt = (reg_fmt_value >= 0) ? (u32)reg_fmt_value : (u32)snd_pcm_format_width(runtime->format);
+		writel(fmt, chip->iobase + reg_fmt_offset);
+		dev_info(&chip->pci->dev, "prepare: format reg 0x%x = %u\n",
+			 reg_fmt_offset, fmt);
 	}
 
 	if (dump_on_trigger) {
@@ -548,6 +580,58 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 	return handled;
 }
 
+/* ----- Device init (Windows FUN_140003d60 style: init reads + enable) ----- */
+
+/*
+ * Init writes table: run in order at probe when do_init_sequence is true.
+ * Fill from scripts/ghidra trace_init_writes.py output (init_writes_likely.txt).
+ * Sentinel: offset 0xFFFFFFFF ends the table.
+ */
+#define INIT_WRITE_SENTINEL	0xFFFFFFFFu
+/* Minimal: STATUS2, then CONTROL 0 then enable. init_control_value overrides last 0x100 write. */
+static const struct { u32 offset; u32 value; } quantum_init_writes[] = {
+	{ 0x8,   0x8 },       /* STATUS2 (from trace) */
+	{ 0x100, 0 },         /* CONTROL stop */
+	{ 0x100, 0x8 },       /* CONTROL enable (or init_control_value if >= 0) */
+	{ INIT_WRITE_SENTINEL, 0 },
+};
+
+static void quantum_device_init(struct quantum_chip *chip)
+{
+	struct pci_dev *pci = chip->pci;
+	void __iomem *iobase = chip->iobase;
+	size_t i;
+
+	if (!iobase)
+		return;
+
+	/* Same register reads as Windows init (FUN_140003d60) */
+	dev_info(&pci->dev, "Init: Version 0x00=0x%08x Status1 0x04=0x%08x Status2 0x08=0x%08x\n",
+		 readl(iobase + QUANTUM_REG_VERSION),
+		 readl(iobase + QUANTUM_REG_STATUS1),
+		 readl(iobase + QUANTUM_REG_STATUS2));
+	dev_info(&pci->dev, "Init: Status3 0x10=0x%08x Status4 0x14=0x%08x Status5 0x104=0x%08x\n",
+		 readl(iobase + QUANTUM_REG_STATUS3),
+		 readl(iobase + QUANTUM_REG_STATUS4),
+		 readl(iobase + QUANTUM_REG_STATUS5));
+
+	if (!do_init_sequence)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(quantum_init_writes); i++) {
+		u32 off = quantum_init_writes[i].offset;
+		u32 val = quantum_init_writes[i].value;
+		if (off == INIT_WRITE_SENTINEL)
+			break;
+		if (off == QUANTUM_REG_CONTROL && init_control_value >= 0)
+			val = (u32)init_control_value;
+		writel(val, iobase + off);
+		dev_info(&pci->dev, "Init: 0x%x = 0x%x\n", off, val);
+	}
+	/* Give hardware time to settle (some interfaces need this for LED/ready) */
+	msleep(20);
+}
+
 /* ----- Create chip: enable PCI, claim BAR, IRQ, MMIO probe ----- */
 
 static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
@@ -592,15 +676,9 @@ static int snd_quantum_create(struct snd_card *card, struct pci_dev *pci)
 	/* Log first 64 bytes of BAR 0 for reverse-engineering (word-aligned) */
 	for (i = 0; i < 64; i += 4)
 		dev_info(&pci->dev, "MMIO+0x%02x: 0x%08x\n", i, readl(chip->iobase + i));
-	
-	/* Read status registers to check device initialization
-	 * Note: Blue LED should be solid when device is properly initialized
-	 * Register 0x04 (STATUS1) may indicate device ready state
-	 */
-	dev_info(&pci->dev, "Device status check (LED should be solid if initialized):\n");
-	dev_info(&pci->dev, "  Version (0x00): 0x%08x\n", readl(chip->iobase + QUANTUM_REG_VERSION));
-	dev_info(&pci->dev, "  Status1 (0x04): 0x%08x\n", readl(chip->iobase + QUANTUM_REG_STATUS1));
-	dev_info(&pci->dev, "  Status2 (0x08): 0x%08x\n", readl(chip->iobase + QUANTUM_REG_STATUS2));
+
+	/* Device init: same reads as Windows + CONTROL 0 then 0x8 (for blue LED / audio) */
+	quantum_device_init(chip);
 
 	/* Register access for reverse engineering */
 	if (reg_scan) {

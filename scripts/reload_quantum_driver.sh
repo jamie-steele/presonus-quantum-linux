@@ -1,16 +1,17 @@
 #!/bin/bash
-# Reload snd-quantum2626: stop audio, kill anything using card 4, rmmod, insmod, start audio.
+# Reload snd-quantum2626: stop audio, mask pipewire, kill anything using Quantum card, rmmod, insmod, unmask, start audio.
 # Run with: ./scripts/reload_quantum_driver.sh
 # Optional: MODPARAMS="reg_srate_offset=0x108 reg_srate_value=48000" ./scripts/reload_quantum_driver.sh
 # Optional: RELOAD_ONLY=1 ... (do not start pipewire at the end)
-# Optional: RELOAD_FORCE_MASK=1 ... (mask user audio so it cannot respawn; unmask at end)
 # If rmmod still fails, log out completely, switch to TTY2 (Ctrl+Alt+F2), run:
 #   sudo rmmod snd_quantum2626 && sudo insmod /home/jamie/source/Quantum2626/driver/snd-quantum2626.ko
 # Then switch back (Ctrl+Alt+F1) and log in.
 
 set -e
 DRIVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/driver"
-CARD=4
+# Detect Quantum card (module must be loaded); fallback 4 if not found
+CARD=$(cat /proc/asound/cards 2>/dev/null | grep -i quantum | head -1 | awk '{print $1}')
+[ -z "$CARD" ] && CARD=4
 
 # Stop socket first so nothing restarts pipewire when we stop it
 echo "Stopping user audio (socket, then services)..."
@@ -20,15 +21,14 @@ systemctl --user stop pipewire 2>/dev/null || true
 systemctl --user stop wireplumber 2>/dev/null || true
 sleep 3
 
-if [ -n "${RELOAD_FORCE_MASK:-}" ]; then
-  echo "Masking user audio (prevents respawn)..."
-  systemctl --user mask pipewire.socket pipewire pipewire-pulse wireplumber 2>/dev/null || true
-  sleep 2
-  for dev in /dev/snd/controlC$CARD /dev/snd/pcmC${CARD}D0p /dev/snd/pcmC${CARD}D0c; do
-    [ -e "$dev" ] && sudo fuser -k "$dev" 2>/dev/null || true
-  done
-  sleep 2
-fi
+# Always mask during release so pipewire/wireplumber cannot respawn and grab the card
+echo "Masking user audio (prevents respawn)..."
+systemctl --user mask pipewire.socket pipewire pipewire-pulse wireplumber 2>/dev/null || true
+sleep 2
+for dev in /dev/snd/controlC$CARD /dev/snd/pcmC${CARD}D0p /dev/snd/pcmC${CARD}D0c; do
+  [ -e "$dev" ] && sudo fuser -k "$dev" 2>/dev/null || true
+done
+sleep 2
 
 echo "Releasing Quantum (card $CARD): stop + kill until free..."
 MAX_TRIES=12
@@ -53,12 +53,12 @@ for try in $(seq 1 $MAX_TRIES); do
     break
   fi
   if [ $try -eq $MAX_TRIES ]; then
-    echo "ERROR: After $MAX_TRIES tries, something still has the Quantum open:"
+    echo "ERROR: After $MAX_TRIES tries, something still has the Quantum (card $CARD) open:"
     echo "$still"
     echo ""
-    echo "Last resort: run with RELOAD_FORCE_MASK=1 to temporarily mask user audio:"
-    echo "  RELOAD_FORCE_MASK=1 ./scripts/reload_quantum_driver.sh"
-    echo "Or log out, TTY2: sudo rmmod snd_quantum2626 && sudo insmod $DRIVER_DIR/snd-quantum2626.ko"
+    echo "Last resort: log out, switch to TTY2 (Ctrl+Alt+F2), run:"
+    echo "  sudo rmmod snd_quantum2626 && sudo insmod $DRIVER_DIR/snd-quantum2626.ko"
+    systemctl --user unmask pipewire.socket pipewire pipewire-pulse wireplumber 2>/dev/null || true
     exit 1
   fi
   sleep 1
@@ -80,10 +80,8 @@ if [ -n "${MODPARAMS:-}" ]; then
 else
   sudo insmod "$DRIVER_DIR/snd-quantum2626.ko"
 fi
-if [ -n "${RELOAD_FORCE_MASK:-}" ]; then
-  echo "Unmasking user audio..."
-  systemctl --user unmask pipewire.socket pipewire pipewire-pulse wireplumber 2>/dev/null || true
-fi
+echo "Unmasking user audio..."
+systemctl --user unmask pipewire.socket pipewire pipewire-pulse wireplumber 2>/dev/null || true
 if [ -z "${RELOAD_ONLY:-}" ]; then
   echo "Starting user audio..."
   systemctl --user start pipewire pipewire-pulse wireplumber 2>/dev/null || true

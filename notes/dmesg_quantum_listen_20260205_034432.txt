@@ -1,0 +1,150 @@
+[ 6044.053234] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6044.053240] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6045.059674] snd-quantum2626 0000:09:00.0: prepare playback: dma_addr=0xffe70000 buffer_size=65536 -> 0xffe70000
+[ 6045.059692] snd-quantum2626 0000:09:00.0: prepare: STATUS2 0x8 = 0x0
+[ 6045.059693] snd-quantum2626 0000:09:00.0: prepare: STATUS3 0x10 = 0x0
+[ 6045.059694] snd-quantum2626 0000:09:00.0: prepare: CONTROL 0x100 = 0x8 (rate=44100 format=16)
+[ 6045.059785] snd-quantum2626 0000:09:00.0: trigger START playback: CONTROL 0x100 was 0xffffffff now 0x8
+[ 6789.473790] snd-quantum2626 0000:09:00.0: trigger STOP playback: CONTROL 0x100 was 0xffffffff now 0x0
+[ 6794.199628] snd-quantum2626 0000:09:00.0: MMIO+0x00: 0x00000000
+[ 6794.199636] snd-quantum2626 0000:09:00.0: MMIO+0x04: 0x01030060
+[ 6794.199641] snd-quantum2626 0000:09:00.0: MMIO+0x08: 0x00000010
+[ 6794.199646] snd-quantum2626 0000:09:00.0: MMIO+0x0c: 0xffffffff
+[ 6794.199651] snd-quantum2626 0000:09:00.0: MMIO+0x10: 0x00000000
+[ 6794.199656] snd-quantum2626 0000:09:00.0: MMIO+0x14: 0x00000000
+[ 6794.199661] snd-quantum2626 0000:09:00.0: MMIO+0x18: 0xffffffff
+[ 6794.199666] snd-quantum2626 0000:09:00.0: MMIO+0x1c: 0xffffffff
+[ 6794.199671] snd-quantum2626 0000:09:00.0: MMIO+0x20: 0xffffffff
+[ 6794.199676] snd-quantum2626 0000:09:00.0: MMIO+0x24: 0xffffffff
+[ 6794.199681] snd-quantum2626 0000:09:00.0: MMIO+0x28: 0xffffffff
+[ 6794.199686] snd-quantum2626 0000:09:00.0: MMIO+0x2c: 0xffffffff
+[ 6794.199691] snd-quantum2626 0000:09:00.0: MMIO+0x30: 0xffffffff
+[ 6794.199696] snd-quantum2626 0000:09:00.0: MMIO+0x34: 0xffffffff
+[ 6794.199701] snd-quantum2626 0000:09:00.0: MMIO+0x38: 0xffffffff
+[ 6794.199706] snd-quantum2626 0000:09:00.0: MMIO+0x3c: 0xffffffff
+[ 6794.199707] snd-quantum2626 0000:09:00.0: Device status check (LED should be solid if initialized):
+[ 6794.199712] snd-quantum2626 0000:09:00.0:   Version (0x00): 0x00000000
+[ 6794.199717] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6794.199722] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6795.805520] snd-quantum2626 0000:09:00.0: MMIO+0x00: 0x00000000
+[ 6795.805529] snd-quantum2626 0000:09:00.0: MMIO+0x04: 0x01030060
+[ 6795.805534] snd-quantum2626 0000:09:00.0: MMIO+0x08: 0x00000010
+[ 6795.805539] snd-quantum2626 0000:09:00.0: MMIO+0x0c: 0xffffffff
+[ 6795.805544] snd-quantum2626 0000:09:00.0: MMIO+0x10: 0x00000000
+[ 6795.805549] snd-quantum2626 0000:09:00.0: MMIO+0x14: 0x00000000
+[ 6795.805554] snd-quantum2626 0000:09:00.0: MMIO+0x18: 0xffffffff
+[ 6795.805559] snd-quantum2626 0000:09:00.0: MMIO+0x1c: 0xffffffff
+[ 6795.805564] snd-quantum2626 0000:09:00.0: MMIO+0x20: 0xffffffff
+[ 6795.805569] snd-quantum2626 0000:09:00.0: MMIO+0x24: 0xffffffff
+[ 6795.805574] snd-quantum2626 0000:09:00.0: MMIO+0x28: 0xffffffff
+[ 6795.805579] snd-quantum2626 0000:09:00.0: MMIO+0x2c: 0xffffffff
+[ 6795.805584] snd-quantum2626 0000:09:00.0: MMIO+0x30: 0xffffffff
+[ 6795.805589] snd-quantum2626 0000:09:00.0: MMIO+0x34: 0xffffffff
+[ 6795.805594] snd-quantum2626 0000:09:00.0: MMIO+0x38: 0xffffffff
+[ 6795.805599] snd-quantum2626 0000:09:00.0: MMIO+0x3c: 0xffffffff
+[ 6795.805600] snd-quantum2626 0000:09:00.0: Device status check (LED should be solid if initialized):
+[ 6795.805605] snd-quantum2626 0000:09:00.0:   Version (0x00): 0x00000000
+[ 6795.805610] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6795.805615] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6796.810226] snd-quantum2626 0000:09:00.0: prepare playback: dma_addr=0xffe70000 buffer_size=65536 -> 0xffe70000
+[ 6796.810243] snd-quantum2626 0000:09:00.0: prepare: STATUS2 0x8 = 0x0
+[ 6796.810245] snd-quantum2626 0000:09:00.0: prepare: STATUS3 0x10 = 0x0
+[ 6796.810245] snd-quantum2626 0000:09:00.0: prepare: CONTROL 0x100 = 0x8 (rate=44100 format=16)
+[ 6796.810278] snd-quantum2626 0000:09:00.0: trigger START playback: CONTROL 0x100 was 0xffffffff now 0x8
+[ 6797.223278] snd-quantum2626 0000:09:00.0: trigger STOP playback: CONTROL 0x100 was 0xffffffff now 0x0
+[ 6801.326280] snd-quantum2626 0000:09:00.0: MMIO+0x00: 0x00000000
+[ 6801.326288] snd-quantum2626 0000:09:00.0: MMIO+0x04: 0x01030060
+[ 6801.326293] snd-quantum2626 0000:09:00.0: MMIO+0x08: 0x00000010
+[ 6801.326299] snd-quantum2626 0000:09:00.0: MMIO+0x0c: 0xffffffff
+[ 6801.326304] snd-quantum2626 0000:09:00.0: MMIO+0x10: 0x00000000
+[ 6801.326309] snd-quantum2626 0000:09:00.0: MMIO+0x14: 0x00000000
+[ 6801.326314] snd-quantum2626 0000:09:00.0: MMIO+0x18: 0xffffffff
+[ 6801.326319] snd-quantum2626 0000:09:00.0: MMIO+0x1c: 0xffffffff
+[ 6801.326324] snd-quantum2626 0000:09:00.0: MMIO+0x20: 0xffffffff
+[ 6801.326329] snd-quantum2626 0000:09:00.0: MMIO+0x24: 0xffffffff
+[ 6801.326334] snd-quantum2626 0000:09:00.0: MMIO+0x28: 0xffffffff
+[ 6801.326339] snd-quantum2626 0000:09:00.0: MMIO+0x2c: 0xffffffff
+[ 6801.326344] snd-quantum2626 0000:09:00.0: MMIO+0x30: 0xffffffff
+[ 6801.326349] snd-quantum2626 0000:09:00.0: MMIO+0x34: 0xffffffff
+[ 6801.326353] snd-quantum2626 0000:09:00.0: MMIO+0x38: 0xffffffff
+[ 6801.326358] snd-quantum2626 0000:09:00.0: MMIO+0x3c: 0xffffffff
+[ 6801.326359] snd-quantum2626 0000:09:00.0: Device status check (LED should be solid if initialized):
+[ 6801.326364] snd-quantum2626 0000:09:00.0:   Version (0x00): 0x00000000
+[ 6801.326369] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6801.326374] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6802.330600] snd-quantum2626 0000:09:00.0: prepare playback: dma_addr=0xffe50000 buffer_size=65536 -> 0xffe50000
+[ 6802.330618] snd-quantum2626 0000:09:00.0: prepare: CONTROL 0x100 = 0x8 (rate=44100 format=16)
+[ 6802.330645] snd-quantum2626 0000:09:00.0: trigger START playback: CONTROL 0x100 was 0xffffffff now 0x8
+[ 6802.744292] snd-quantum2626 0000:09:00.0: trigger STOP playback: CONTROL 0x100 was 0xffffffff now 0x0
+[ 6806.793957] snd-quantum2626 0000:09:00.0: MMIO+0x00: 0x00000000
+[ 6806.793967] snd-quantum2626 0000:09:00.0: MMIO+0x04: 0x01030060
+[ 6806.793973] snd-quantum2626 0000:09:00.0: MMIO+0x08: 0x00000010
+[ 6806.793978] snd-quantum2626 0000:09:00.0: MMIO+0x0c: 0xffffffff
+[ 6806.793984] snd-quantum2626 0000:09:00.0: MMIO+0x10: 0x00000000
+[ 6806.793989] snd-quantum2626 0000:09:00.0: MMIO+0x14: 0x00000000
+[ 6806.793995] snd-quantum2626 0000:09:00.0: MMIO+0x18: 0xffffffff
+[ 6806.794000] snd-quantum2626 0000:09:00.0: MMIO+0x1c: 0xffffffff
+[ 6806.794005] snd-quantum2626 0000:09:00.0: MMIO+0x20: 0xffffffff
+[ 6806.794010] snd-quantum2626 0000:09:00.0: MMIO+0x24: 0xffffffff
+[ 6806.794016] snd-quantum2626 0000:09:00.0: MMIO+0x28: 0xffffffff
+[ 6806.794021] snd-quantum2626 0000:09:00.0: MMIO+0x2c: 0xffffffff
+[ 6806.794026] snd-quantum2626 0000:09:00.0: MMIO+0x30: 0xffffffff
+[ 6806.794031] snd-quantum2626 0000:09:00.0: MMIO+0x34: 0xffffffff
+[ 6806.794036] snd-quantum2626 0000:09:00.0: MMIO+0x38: 0xffffffff
+[ 6806.794041] snd-quantum2626 0000:09:00.0: MMIO+0x3c: 0xffffffff
+[ 6806.794042] snd-quantum2626 0000:09:00.0: Device status check (LED should be solid if initialized):
+[ 6806.794048] snd-quantum2626 0000:09:00.0:   Version (0x00): 0x00000000
+[ 6806.794053] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6806.794058] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6807.803327] snd-quantum2626 0000:09:00.0: prepare playback: dma_addr=0xffe30000 buffer_size=65536 -> 0xffe30000
+[ 6807.803358] snd-quantum2626 0000:09:00.0: prepare: CONTROL 0x100 = 0x88 (rate=44100 format=16)
+[ 6807.803437] snd-quantum2626 0000:09:00.0: trigger START playback: CONTROL 0x100 was 0xffffffff now 0x88
+[ 6808.215328] snd-quantum2626 0000:09:00.0: trigger STOP playback: CONTROL 0x100 was 0xffffffff now 0x0
+[ 6812.335099] snd-quantum2626 0000:09:00.0: MMIO+0x00: 0x00000000
+[ 6812.335110] snd-quantum2626 0000:09:00.0: MMIO+0x04: 0x01030060
+[ 6812.335116] snd-quantum2626 0000:09:00.0: MMIO+0x08: 0x00000010
+[ 6812.335122] snd-quantum2626 0000:09:00.0: MMIO+0x0c: 0xffffffff
+[ 6812.335128] snd-quantum2626 0000:09:00.0: MMIO+0x10: 0x00000000
+[ 6812.335134] snd-quantum2626 0000:09:00.0: MMIO+0x14: 0x00000000
+[ 6812.335140] snd-quantum2626 0000:09:00.0: MMIO+0x18: 0xffffffff
+[ 6812.335146] snd-quantum2626 0000:09:00.0: MMIO+0x1c: 0xffffffff
+[ 6812.335152] snd-quantum2626 0000:09:00.0: MMIO+0x20: 0xffffffff
+[ 6812.335158] snd-quantum2626 0000:09:00.0: MMIO+0x24: 0xffffffff
+[ 6812.335163] snd-quantum2626 0000:09:00.0: MMIO+0x28: 0xffffffff
+[ 6812.335169] snd-quantum2626 0000:09:00.0: MMIO+0x2c: 0xffffffff
+[ 6812.335175] snd-quantum2626 0000:09:00.0: MMIO+0x30: 0xffffffff
+[ 6812.335181] snd-quantum2626 0000:09:00.0: MMIO+0x34: 0xffffffff
+[ 6812.335186] snd-quantum2626 0000:09:00.0: MMIO+0x38: 0xffffffff
+[ 6812.335192] snd-quantum2626 0000:09:00.0: MMIO+0x3c: 0xffffffff
+[ 6812.335194] snd-quantum2626 0000:09:00.0: Device status check (LED should be solid if initialized):
+[ 6812.335199] snd-quantum2626 0000:09:00.0:   Version (0x00): 0x00000000
+[ 6812.335205] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6812.335211] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6813.341559] snd-quantum2626 0000:09:00.0: prepare playback: dma_addr=0xffe10000 buffer_size=65536 -> 0xffe10000
+[ 6813.341577] snd-quantum2626 0000:09:00.0: prepare: CONTROL 0x100 = 0x9 (rate=44100 format=16)
+[ 6813.341642] snd-quantum2626 0000:09:00.0: trigger START playback: CONTROL 0x100 was 0xffffffff now 0x9
+[ 6813.751322] snd-quantum2626 0000:09:00.0: trigger STOP playback: CONTROL 0x100 was 0xffffffff now 0x0
+[ 6817.834952] snd-quantum2626 0000:09:00.0: MMIO+0x00: 0x00000000
+[ 6817.834960] snd-quantum2626 0000:09:00.0: MMIO+0x04: 0x01030060
+[ 6817.834965] snd-quantum2626 0000:09:00.0: MMIO+0x08: 0x00000010
+[ 6817.834970] snd-quantum2626 0000:09:00.0: MMIO+0x0c: 0xffffffff
+[ 6817.834975] snd-quantum2626 0000:09:00.0: MMIO+0x10: 0x00000000
+[ 6817.834980] snd-quantum2626 0000:09:00.0: MMIO+0x14: 0x00000000
+[ 6817.834985] snd-quantum2626 0000:09:00.0: MMIO+0x18: 0xffffffff
+[ 6817.834990] snd-quantum2626 0000:09:00.0: MMIO+0x1c: 0xffffffff
+[ 6817.834995] snd-quantum2626 0000:09:00.0: MMIO+0x20: 0xffffffff
+[ 6817.835000] snd-quantum2626 0000:09:00.0: MMIO+0x24: 0xffffffff
+[ 6817.835005] snd-quantum2626 0000:09:00.0: MMIO+0x28: 0xffffffff
+[ 6817.835010] snd-quantum2626 0000:09:00.0: MMIO+0x2c: 0xffffffff
+[ 6817.835015] snd-quantum2626 0000:09:00.0: MMIO+0x30: 0xffffffff
+[ 6817.835020] snd-quantum2626 0000:09:00.0: MMIO+0x34: 0xffffffff
+[ 6817.835025] snd-quantum2626 0000:09:00.0: MMIO+0x38: 0xffffffff
+[ 6817.835030] snd-quantum2626 0000:09:00.0: MMIO+0x3c: 0xffffffff
+[ 6817.835031] snd-quantum2626 0000:09:00.0: Device status check (LED should be solid if initialized):
+[ 6817.835036] snd-quantum2626 0000:09:00.0:   Version (0x00): 0x00000000
+[ 6817.835041] snd-quantum2626 0000:09:00.0:   Status1 (0x04): 0x01030060
+[ 6817.835046] snd-quantum2626 0000:09:00.0:   Status2 (0x08): 0x00000010
+[ 6818.839365] snd-quantum2626 0000:09:00.0: prepare playback: dma_addr=0xfffc0000 buffer_size=65536 -> 0xfffc0000
+[ 6818.839382] snd-quantum2626 0000:09:00.0: prepare: CONTROL 0x100 = 0x10 (rate=44100 format=16)
+[ 6818.839410] snd-quantum2626 0000:09:00.0: trigger START playback: CONTROL 0x100 was 0xffffffff now 0x10
+[ 6819.255396] snd-quantum2626 0000:09:00.0: trigger STOP playback: CONTROL 0x100 was 0xffffffff now 0x0

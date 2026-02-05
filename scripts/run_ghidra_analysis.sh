@@ -41,21 +41,47 @@ if [ ! -f "$SCRIPT_DIR/$POST_SCRIPT" ]; then
 fi
 
 mkdir -p "$PROJECT_DIR"
+# Remove existing project so -import doesn't hit "conflicting program file"
+rm -rf "$PROJECT_DIR/${PROJECT_NAME}.rep" "$PROJECT_DIR/${PROJECT_NAME}.gpr"
+
+# Ghidra 12+ needs JDK 21. Use it if available so the launcher doesn't prompt.
+if [ -z "${JAVA_HOME:-}" ]; then
+  for jdk in /usr/lib/jvm/java-21-openjdk-amd64 /usr/lib/jvm/java-21-openjdk-*; do
+    if [ -d "$jdk" ] && [ -x "$jdk/bin/java" ]; then
+      export JAVA_HOME="$jdk"
+      break
+    fi
+  done
+fi
+if [ -n "${JAVA_HOME:-}" ]; then
+  echo "  JAVA_HOME: $JAVA_HOME"
+fi
+
 echo "=== Ghidra headless ==="
 echo "  Ghidra:    $GHIDRA_ROOT"
 echo "  Driver:    $DRIVER_BIN"
-echo "  Project:   $PROJECT_DIR / $PROJECT_NAME"
 echo "  PostScript: $POST_SCRIPT"
 echo ""
 
-# -import imports and analyzes the binary; -postScript runs after analysis
-# Script output goes to console; script can also write files to SCRIPT_DIR
-"$HEADLESS" \
-  "$PROJECT_DIR" \
-  "$PROJECT_NAME" \
-  -import "$DRIVER_BIN" \
-  -scriptPath "$SCRIPT_DIR" \
-  -postScript "$POST_SCRIPT"
+# Prefer PyGhidra so Python scripts (e.g. trace_stream_start_writes.py) actually run
+export GHIDRA_INSTALL_DIR="$GHIDRA_ROOT"
+PYGHIDRA_PYTHON=""
+[ -x "$REPO/tools/ghidra_venv/bin/python3" ] && "$REPO/tools/ghidra_venv/bin/python3" -c "import pyghidra" 2>/dev/null && PYGHIDRA_PYTHON="$REPO/tools/ghidra_venv/bin/python3"
+[ -z "$PYGHIDRA_PYTHON" ] && command -v python3 >/dev/null 2>&1 && python3 -c "import pyghidra" 2>/dev/null && PYGHIDRA_PYTHON="python3"
+if [ -n "$PYGHIDRA_PYTHON" ]; then
+  echo "  Using PyGhidra (Python)."
+  $PYGHIDRA_PYTHON -m pyghidra "$DRIVER_BIN" "$SCRIPT_DIR/$POST_SCRIPT"
+else
+  echo "  ERROR: PyGhidra not found. Python scripts need PyGhidra (analyzeHeadless uses Jython only)."
+  echo ""
+  echo "  Install PyGhidra, then re-run:"
+  echo "    ./scripts/setup_ghidra_linux.sh"
+  echo "  Or manually (with venv):"
+  echo "    GHIDRA_INSTALL_DIR=$GHIDRA_ROOT tools/ghidra_venv/bin/python3 -m ensurepip --upgrade"
+  echo "    GHIDRA_INSTALL_DIR=$GHIDRA_ROOT tools/ghidra_venv/bin/python3 -m pip install pyghidra"
+  echo "  Then: ./scripts/run_ghidra_analysis.sh"
+  exit 1
+fi
 
 echo ""
 echo "Done. If the script wrote files, check $SCRIPT_DIR/"

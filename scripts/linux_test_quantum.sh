@@ -6,31 +6,38 @@
 #   ./scripts/linux_test_quantum.sh --no-reload --duration 3
 #   ./scripts/linux_test_quantum.sh --build
 #   RELOAD_FORCE_MASK=1 ./scripts/linux_test_quantum.sh   # if wireplumber keeps respawning
-#   ./scripts/linux_test_quantum.sh --sound /usr/share/sounds/alsa/Front_Left.wav  # play real sound to hear if hardware works
+#   ./scripts/linux_test_quantum.sh --sound   # uses samples/*.wav if no path given
+#   ./scripts/linux_test_quantum.sh --sound /path/to/file.wav
 set -e
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DRIVER_DIR="$REPO/driver"
 NOTES_DIR="$REPO/notes"
+SAMPLES_DIR="$REPO/samples"
 CARD=4
 RELOAD=1
 DURATION=5
 BUILD=0
 SOUND_FILE=""
+SOUND_FLAG=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-reload) RELOAD=0 ;;
     --duration)  DURATION="$2"; shift ;;
     --build)     BUILD=1 ;;
-    --sound)     SOUND_FILE="$2"; shift ;;
+    --sound)     SOUND_FLAG=1; SOUND_FILE="$2"; shift ;;
   esac
   shift
 done
+# If --sound with no path, use first WAV in samples/
+if [ "$SOUND_FLAG" -eq 1 ] && { [ -z "$SOUND_FILE" ] || [ ! -f "$SOUND_FILE" ]; }; then
+  SOUND_FILE=$(ls "$SAMPLES_DIR"/*.wav 2>/dev/null | head -1)
+fi
 
 # MODPARAMS: set from env, e.g. MODPARAMS="reg_srate_offset=0x108 reg_srate_value=48000"
 MODPARAMS=$(echo "${MODPARAMS:-}" | sed 's/^ *//; s/ *$//')
 
-echo "=== Quantum 2626 test: reload=$RELOAD duration=${DURATION}s build=$BUILD ==="
+echo "=== Quantum 2626 test: card=$CARD reload=$RELOAD duration=${DURATION}s build=$BUILD ==="
 [ -n "$MODPARAMS" ] && echo "MODPARAMS: $MODPARAMS"
 
 if [ "$BUILD" -eq 1 ]; then
@@ -44,6 +51,10 @@ if [ "$RELOAD" -eq 1 ]; then
   "$REPO/scripts/reload_quantum_driver.sh"
   sleep 1
 fi
+
+# Auto-detect Quantum card index (after reload it may not be 4)
+CARD=$(cat /proc/asound/cards 2>/dev/null | grep -i quantum | head -1 | awk '{print $1}')
+[ -z "$CARD" ] && CARD=4
 
 if [ -n "$SOUND_FILE" ] && [ -f "$SOUND_FILE" ]; then
   echo "Playing sound: $SOUND_FILE (listen for output on Quantum)"

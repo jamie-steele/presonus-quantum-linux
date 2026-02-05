@@ -1,0 +1,4 @@
+# Paste into driver or try as module params (offset value)
+0x10 ?
+0x8 ?
+0x100 0x8
