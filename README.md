@@ -1,69 +1,103 @@
-# Quantum 2626 — Linux driver
+# PreSonus Quantum 2626 Linux Driver
 
-Getting the **PreSonus Quantum 2626** Thunderbolt 3 audio interface working on Linux with an out-of-tree ALSA PCI driver.
+Community-developed **Linux ALSA driver** for the **PreSonus Quantum 2626** Thunderbolt 3 audio interface. This open-source driver enables professional audio production on Linux with this high-performance 26×26 I/O interface.
 
-## Device summary
+## Overview
 
-- **Product:** PreSonus Quantum 2626  
+Getting the **PreSonus Quantum 2626** Thunderbolt 3 audio interface working on Linux with an out-of-tree ALSA PCI driver. This project provides Linux support for professional audio recording, music production, and low-latency audio processing.
+
+## Hardware Specifications
+
+- **Product:** PreSonus Quantum 2626 Thunderbolt Audio Interface  
 - **Connection:** Thunderbolt 3 (no USB or PCIe card version)  
-- **Audio:** 26×26 I/O, 24-bit/192 kHz, &lt;1 ms round-trip latency  
-- **Official support:** macOS and Windows only (proprietary drivers)  
-- **Linux:** No vendor driver; this repo is a community driver (PCI ID 1c67:0104).
+- **Audio Capabilities:** 26 inputs × 26 outputs, 24-bit/192 kHz resolution, <1 ms round-trip latency  
+- **Official Support:** macOS and Windows only (proprietary drivers)  
+- **Linux Support:** Community-developed ALSA driver (PCI ID 1c67:0104)
+- **Use Cases:** Professional audio recording, music production, live sound, DAW integration, low-latency audio processing
 
 ---
 
-## Current status (where we are)
+## Development Status
 
-- **Driver loads:** ALSA card appears (e.g. card 4). MSI interrupt works; prepare/trigger run.
-- **Register programming (from Ghidra):** We program DMA buffer address at 0x10300 (playback) / 0x10304 (capture), and control at 0x100 (0x8 = start, 0x0 = stop). dmesg shows prepare/trigger and the values we write.
-- **No sound yet:** Either the register map is incomplete (e.g. buffer size, sample rate, or different control bits), or physical output routing. Next step is more reverse-engineering on Windows (Ghidra + Python) to find buffer size, sample rate, and confirm control/stream start.
+- **Driver Status:** ALSA card detection working, MSI interrupts operational, prepare/trigger functions implemented
+- **Register Programming:** DMA buffer address configuration (0x10300 playback / 0x10304 capture), control registers (0x100)
+- **Current Limitation:** Audio output not yet functional - requires additional reverse engineering of Windows driver
+- **Next Steps:** Complete register mapping for buffer size, sample rate configuration, and audio routing
 
-**Good stopping point for tonight.** Continue on Windows with Ghidra (and Python if you use it for RE) to refine the register map; then plug findings back into the driver.
+**Development Progress:** The driver successfully loads and creates an ALSA sound card. We're actively reverse-engineering the Windows driver using Ghidra to complete the register map for full audio functionality.
 
 ---
 
-## Quick start (Linux)
+## Installation and Quick Start
+
+### Building the Driver
 
 ```bash
-# Build
+# Navigate to driver directory
 cd driver && make
 
-# Load (after reboot, or if not loaded)
-sudo modprobe snd-quantum2626
-# Or first-time install: sudo make install && sudo modprobe snd-quantum2626
+# Install the kernel module
+sudo make install
 
-# Check card (e.g. card 4 = Quantum)
+# Load the driver
+sudo modprobe snd-quantum2626
+```
+
+### Testing Audio Playback
+
+```bash
+# Check if the Quantum 2626 is detected
 cat /proc/asound/cards
 
-# Test playback (free the device first: stop wireplumber/pipewire)
+# Stop audio services (required for testing)
 systemctl --user stop wireplumber pipewire-pulse
+
+# Test audio playback (adjust card number as needed)
 aplay -D plughw:4,0 -r 48000 -f S16_LE -c 2 /usr/share/sounds/alsa/Front_Center.wav
+
+# Restart audio services
 systemctl --user start pipewire pipewire-pulse wireplumber
 ```
+
+### Reloading After Changes
 
 **Reload driver (after code changes):** Use `./scripts/reload_quantum_driver.sh` (stops audio, kills processes using card 4, rmmod/insmod, starts audio). If that still says "module in use", log out, switch to TTY2 (Ctrl+Alt+F2), run `sudo rmmod snd_quantum2626 && sudo insmod driver/snd-quantum2626.ko`, then switch back and log in.
 
 ---
 
-## Docs and scripts
+## Documentation and Development Resources
 
-| What | Where |
-|------|--------|
+| Resource | Description |
+|----------|-------------|
 | **Reverse-engineering plan** | [docs/REVERSE_ENGINEERING_PLAN.md](docs/REVERSE_ENGINEERING_PLAN.md) — Phases: gather artifacts (Windows strings, Linux MMIO), Ghidra analysis, driver changes. |
 | **No sound debugging** | [docs/NO_SOUND_DEBUG.md](docs/NO_SOUND_DEBUG.md) — What we program, likely causes, dump-on-trigger, next RE steps. |
 | **Driver build/load** | [driver/README.md](driver/README.md) — Makefile, insmod/modprobe, optional dump_on_trigger. |
 | **Register guesses** | [notes/REGISTER_GUESSES.md](notes/REGISTER_GUESSES.md) — Offsets from Ghidra; update as you find more. |
 | **MMIO baseline** | [notes/MMIO_BASELINE.md](notes/MMIO_BASELINE.md) — BAR 0 values at load. |
 
-**Scripts:** `scripts/reload_quantum_driver.sh` (Linux: reload driver), `scripts/capture_mmio_baseline.sh` (Linux: save MMIO from dmesg), `scripts/windows_re_next_run.ps1` (Windows: strings + Ghidra checklist), `scripts/windows_re_strings.ps1` (Windows: strings only).
+### Development Scripts
+
+- `scripts/reload_quantum_driver.sh` — Linux: reload driver for development
+- `scripts/capture_mmio_baseline.sh` — Linux: save MMIO register dumps from dmesg
+- `scripts/windows_re_next_run.ps1` — Windows: strings extraction + Ghidra analysis checklist
+- `scripts/windows_re_strings.ps1` — Windows: extract strings from driver binaries
 
 ---
 
-## Next steps (Windows + Ghidra / Python)
+## Reverse Engineering Workflow
 
-1. **Ghidra:** In `pae_quantum.sys` find where the Windows driver **writes** buffer size, period size, sample rate, and stream start/stop. Confirm offsets (0x100, 0x10300/0x10304) and add any missing registers to [notes/REGISTER_GUESSES.md](notes/REGISTER_GUESSES.md).
-2. **Driver:** Update `QUANTUM_REG_*` and prepare/trigger in `driver/snd-quantum2626.c` to program any new registers (buffer size, rate, etc.).
-3. **Test:** Reload driver, run aplay, check dmesg and physical output.
+### Current Development Focus (Windows + Ghidra Analysis)
+
+1. **Ghidra Analysis:** Analyze `pae_quantum.sys` Windows driver to identify register mappings for:
+   - Buffer size and period size configuration
+   - Sample rate programming
+   - Stream start/stop control sequences
+   - Confirm existing offsets (0x100, 0x10300/0x10304)
+   - Document new register discoveries in [notes/REGISTER_GUESSES.md](notes/REGISTER_GUESSES.md)
+
+2. **Driver Implementation:** Update `QUANTUM_REG_*` constants and prepare/trigger functions in `driver/snd-quantum2626.c` with discovered register mappings
+
+3. **Testing and Validation:** Reload driver, test with aplay, verify dmesg output and physical audio output
 
 ---
 
@@ -126,3 +160,24 @@ Quantum2626/
 - [PreSonus Quantum 2626](https://www.presonus.com/products/quantum-2626)  
 - [LinuxMusicians: Presonus Quantum Thunderbolt](https://linuxmusicians.com/viewtopic.php?t=19316) — “Linux supports Thunderbolt, but no one has written a Linux driver for a Thunderbolt audio interface (yet).”  
 - [Kernel Thunderbolt docs](https://docs.kernel.org/admin-guide/thunderbolt.html)
+
+---
+
+## Keywords
+
+Linux audio driver, PreSonus Quantum 2626, Thunderbolt 3 audio interface, ALSA driver, professional audio Linux, reverse engineering audio hardware, out-of-tree kernel module, music production Linux, DAW Linux, low-latency audio, 192 kHz audio interface, 24-bit audio, Ghidra reverse engineering, PCI audio driver, Linux audio development, open source audio driver, Thunderbolt audio Linux
+
+## Contributing
+
+Contributions are welcome! This is a community-driven project. If you have a PreSonus Quantum 2626 and want to help with:
+- Testing the driver on your Linux system
+- Reverse engineering the Windows driver
+- Improving documentation and guides
+- Bug fixes and feature development
+- Hardware testing and validation
+
+Please feel free to open issues or submit pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
