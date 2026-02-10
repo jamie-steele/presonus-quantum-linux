@@ -67,13 +67,27 @@ systemctl --user start pipewire pipewire-pulse wireplumber
 
 ## Documentation and Development Resources
 
+### Getting Started
 | Resource | Description |
 |----------|-------------|
-| **Reverse-engineering plan** | [docs/REVERSE_ENGINEERING_PLAN.md](docs/REVERSE_ENGINEERING_PLAN.md) — Phases: gather artifacts (Windows strings, Linux MMIO), Ghidra analysis, driver changes. |
-| **No sound debugging** | [docs/NO_SOUND_DEBUG.md](docs/NO_SOUND_DEBUG.md) — What we program, likely causes, dump-on-trigger, next RE steps. |
-| **Driver build/load** | [driver/README.md](driver/README.md) — Makefile, insmod/modprobe, optional dump_on_trigger. |
-| **Register guesses** | [notes/REGISTER_GUESSES.md](notes/REGISTER_GUESSES.md) — Offsets from Ghidra; update as you find more. |
-| **MMIO baseline** | [notes/MMIO_BASELINE.md](notes/MMIO_BASELINE.md) — BAR 0 values at load. |
+| **Linux Testing** | [docs/LINUX_TESTING.md](docs/LINUX_TESTING.md) — Complete guide with quick start, testing procedures, and troubleshooting |
+| **Driver Build/Load** | [driver/README.md](driver/README.md) — Makefile, insmod/modprobe, optional dump_on_trigger |
+
+### Reverse Engineering
+| Resource | Description |
+|----------|-------------|
+| **Reverse Engineering Plan** | [docs/REVERSE_ENGINEERING_PLAN.md](docs/REVERSE_ENGINEERING_PLAN.md) — Phases: gather artifacts (Windows strings, Linux MMIO), Ghidra analysis, driver changes |
+| **Ghidra Analysis Guide** | [docs/GHIDRA_GUIDE.md](docs/GHIDRA_GUIDE.md) — Complete guide for analyzing the Windows driver with Ghidra |
+| **Windows Profiling** | [docs/STAGE2_RUNBOOK.md](docs/STAGE2_RUNBOOK.md) — Capture device IDs and driver info from Windows 11 |
+| **Windows Register Monitoring** | [docs/WINDOWS_REGISTER_MONITORING.md](docs/WINDOWS_REGISTER_MONITORING.md) — Monitor register access on Windows |
+
+### Debugging and Reference
+| Resource | Description |
+|----------|-------------|
+| **No Sound Debugging** | [docs/NO_SOUND_DEBUG.md](docs/NO_SOUND_DEBUG.md) — What we program, likely causes, dump-on-trigger, next RE steps |
+| **Register Map** | [notes/REGISTER_GUESSES.md](notes/REGISTER_GUESSES.md) — Confirmed and suspected register offsets from Ghidra analysis |
+| **Ghidra Findings** | [notes/GHIDRA_FINDINGS_SUMMARY.md](notes/GHIDRA_FINDINGS_SUMMARY.md) — Summary of reverse engineering findings |
+| **MMIO Baseline** | [notes/MMIO_BASELINE.md](notes/MMIO_BASELINE.md) — BAR 0 register values at load |
 
 ### Development Scripts
 
@@ -112,47 +126,52 @@ systemctl --user start pipewire pipewire-pulse wireplumber
    If it appears as PCIe but has no ALSA device, we know the bus is fine and the gap is a missing audio driver.
 
 2. **Profile on Windows 11 only when reverse-engineering**  
-   Use Windows only when you need to reverse-engineer the device (e.g. to write or adapt a Linux driver). On a Windows 11 machine with the Quantum 2626 working you can capture vendor/device IDs, driver names, and resource usage — see `docs/WINDOWS_PROFILING.md`. We don’t need Windows for basic diagnosis; Linux already gives us the PCI identity (e.g. 1c67:0104).
+   Use Windows only when you need to reverse-engineer the device (e.g. to write or adapt a Linux driver). On a Windows 11 machine with the Quantum 2626 working you can capture vendor/device IDs, driver names, and resource usage — see `docs/STAGE2_RUNBOOK.md`. We don’t need Windows for basic diagnosis; Linux already gives us the PCI identity (e.g. 1c67:0104).
 
 3. **Use the profiling output for Linux**  
    - Match the same vendor/device ID on Linux (`lspci -nn`).
    - If the device is a standard PCIe audio design, existing ALSA drivers might be extended; if it’s custom, we need a minimal driver or reverse‑engineering.
 
 - **Stage 1 (Linux):** [docs/DIAGNOSIS.md](docs/DIAGNOSIS.md) — diagnosis plan (done: device 1c67:0104 visible, no driver).
-- **Try without reverse engineering:** [docs/TRY_WITHOUT_RE.md](docs/TRY_WITHOUT_RE.md) — `new_id` with snd_hda_intel was tried; rejected (Invalid argument). Path closed without reverse engineering.
 - **Stage 2 (Windows):** [docs/STAGE2_RUNBOOK.md](docs/STAGE2_RUNBOOK.md) — Profile on Windows 11, fill `notes/windows_profile.txt` for driver work.
-- **Next — build our own driver:** [docs/NEXT_DRIVER.md](docs/NEXT_DRIVER.md) — Options after Stage 2 (extend existing driver vs new ALSA PCI driver); points at kernel docs and repo notes.
 - **Windows driver reference:** [driver-reference/](driver-reference/) — PreSonus Windows driver files (INF + notes) for IDs and reverse engineering; `.sys`/`.cat`/`.PNF` kept locally only.
 - **Linux driver:** [driver/](driver/) — Out-of-tree ALSA PCI driver; card + PCM, Ghidra-derived register programming (buffer 0x10300/0x10304, control 0x100). Build: `make` in `driver/`; load: `sudo modprobe snd-quantum2626` (after `sudo make install`) or `sudo insmod snd-quantum2626.ko`. Real audio: more RE (buffer size, sample rate, control bits).
 
-## Repository layout
+## Repository Layout
 
 ```
 Quantum2626/
-├── README.md
-├── driver/                   # Linux ALSA PCI driver
+├── README.md                     # Main documentation
+├── driver/                       # Linux ALSA PCI driver
 │   ├── README.md
 │   ├── Makefile
 │   └── snd-quantum2626.c
-├── driver-reference/         # Windows driver (INF, strings; .sys local)
-│   ├── README.md             # What’s here and INF summary
-│   ├── pae_quantum.inf       # Windows setup info (PCI IDs, service, KMDF)
-│   └── strings_*.txt         # From windows_re_strings.ps1
-├── docs/
-│   ├── REVERSE_ENGINEERING_PLAN.md
-│   ├── NO_SOUND_DEBUG.md
-│   ├── DIAGNOSIS.md
-│   ├── STAGE2_RUNBOOK.md
-│   └── WINDOWS_PROFILING.md
-├── notes/
-│   ├── MMIO_BASELINE.md
-│   ├── REGISTER_GUESSES.md
-│   └── ...
-└── scripts/
-    ├── reload_quantum_driver.sh
-    ├── capture_mmio_baseline.sh
-    ├── windows_re_next_run.ps1
-    └── windows_re_strings.ps1
+├── driver-reference/             # Windows driver reference files
+│   ├── README.md                 # INF summary and driver info
+│   ├── pae_quantum.inf           # Windows setup info (PCI IDs, service, KMDF)
+│   └── strings_*.txt             # Extracted strings from Windows driver
+├── docs/                         # Documentation and guides
+│   ├── LINUX_TESTING.md          # Linux testing and troubleshooting guide
+│   ├── GHIDRA_GUIDE.md           # Ghidra reverse engineering guide
+│   ├── REVERSE_ENGINEERING_PLAN.md # Overall RE strategy
+│   ├── STAGE2_RUNBOOK.md         # Windows profiling guide
+│   ├── WINDOWS_REGISTER_MONITORING.md # Windows register monitoring
+│   ├── NO_SOUND_DEBUG.md         # Debugging guide
+│   ├── DIAGNOSIS.md              # Initial diagnosis plan
+│   └── _META/                    # Project metadata files
+├── notes/                        # Development notes and findings
+│   ├── REGISTER_GUESSES.md       # Register offset map (active)
+│   ├── GHIDRA_FINDINGS_SUMMARY.md # Ghidra analysis summary
+│   ├── DRIVER_IMPLEMENTATION.md  # Driver implementation notes
+│   ├── analysis/                 # Analysis data and outputs
+│   │   ├── register_data/        # Register capture data
+│   │   ├── dmesg_logs/           # Linux kernel logs
+│   │   └── ghidra_outputs/       # Ghidra script outputs
+│   └── archive/                  # Historical session logs
+├── scripts/                      # Development and testing scripts
+│   ├── ghidra/                   # Ghidra analysis scripts
+│   └── trace_analysis/           # Trace analysis scripts
+└── samples/                      # Sample files and test data
 ```
 
 ## References
