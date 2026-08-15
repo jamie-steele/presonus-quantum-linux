@@ -138,7 +138,7 @@ struct quantum_chip {
 	struct snd_pcm *pcm;
 	struct snd_pcm_substream *playback_substream;
 	struct snd_pcm_substream *capture_substream;
-	
+
 	/* Hardware state */
 	dma_addr_t playback_dma_addr;
 	dma_addr_t capture_dma_addr;
@@ -227,14 +227,13 @@ static int quantum_pcm_hw_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *hw_params)
 {
 	struct quantum_chip *chip = substream->pcm->private_data;
-	struct snd_pcm_runtime *runtime = substream->runtime;
-	
+
 	/* Store buffer size for later use in prepare() */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		chip->playback_buffer_size = params_buffer_bytes(hw_params);
 	else
 		chip->capture_buffer_size = params_buffer_bytes(hw_params);
-	
+
 	return 0;
 }
 
@@ -289,10 +288,10 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 	/* Read initial status registers (from Ghidra: reads 0x0, 0x4, 0x8, 0x10, 0x14, 0x104) */
 	val = readl(chip->iobase + QUANTUM_REG_VERSION);
 	dev_dbg(&chip->pci->dev, "Version reg (0x%04x): 0x%08x\n", QUANTUM_REG_VERSION, val);
-	
+
 	val = readl(chip->iobase + QUANTUM_REG_STATUS1);
 	dev_dbg(&chip->pci->dev, "Status1 (0x%04x): 0x%08x\n", QUANTUM_REG_STATUS1, val);
-	
+
 	val = readl(chip->iobase + QUANTUM_REG_STATUS5);
 	dev_dbg(&chip->pci->dev, "Status5 (0x%04x): 0x%08x\n", QUANTUM_REG_STATUS5, val);
 
@@ -440,33 +439,17 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 
 static snd_pcm_uframes_t quantum_pcm_pointer(struct snd_pcm_substream *substream)
 {
-	struct quantum_chip *chip = substream->pcm->private_data;
 	struct quantum_runtime *qr = substream->runtime->private_data;
-	struct snd_pcm_runtime *runtime = substream->runtime;
 	unsigned long flags;
-	snd_pcm_uframes_t pos = 0;
-	u32 hw_pos;
+	snd_pcm_uframes_t pos;
 
 	if (!qr)
 		return 0;
 
-	/* Try to read hardware position from MMIO */
-	/* Based on Ghidra: status registers may contain position info */
-	if (chip->iobase) {
-		/* Read status register that might contain position */
-		/* This is a guess - actual position register needs experimentation */
-		hw_pos = readl(chip->iobase + QUANTUM_REG_STATUS5);
-		
-		/* If hardware position is available, use it */
-		/* For now, fall back to software position */
-		spin_lock_irqsave(&qr->lock, flags);
-		pos = qr->position;
-		spin_unlock_irqrestore(&qr->lock, flags);
-	} else {
-		spin_lock_irqsave(&qr->lock, flags);
-		pos = qr->position;
-		spin_unlock_irqrestore(&qr->lock, flags);
-	}
+	/* Use the software position until the real TCI/DMA pointer contract is known. */
+	spin_lock_irqsave(&qr->lock, flags);
+	pos = qr->position;
+	spin_unlock_irqrestore(&qr->lock, flags);
 
 	return pos;
 }
@@ -533,7 +516,7 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 	/* Based on Ghidra: status registers at 0x4, 0x8, 0x10, 0x14, 0x104 */
 	/* Check which one is the interrupt status (needs experimentation) */
 	status = readl(chip->iobase + QUANTUM_REG_STATUS1);
-	
+
 	/* If no interrupt pending, return */
 	/* For now, assume any non-zero status means interrupt */
 	if (status == 0)

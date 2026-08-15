@@ -4,7 +4,7 @@
 # Optional: MODPARAMS="reg_srate_offset=0x108 reg_srate_value=48000" ./scripts/reload_quantum_driver.sh
 # Optional: RELOAD_ONLY=1 ... (do not start pipewire at the end)
 # If rmmod still fails, log out completely, switch to TTY2 (Ctrl+Alt+F2), run:
-#   sudo rmmod snd_quantum2626 && sudo insmod /home/jamie/source/Quantum2626/driver/snd-quantum2626.ko
+#   sudo rmmod snd_quantum2626 && sudo insmod ./driver/snd-quantum2626.ko
 # Then switch back (Ctrl+Alt+F1) and log in.
 
 set -e

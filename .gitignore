@@ -1,5 +1,13 @@
+# Local editor and agent scratch state
+.idea/
+.agents/
+
 # Prerequisites
 *.d
+
+# Python cache files
+__pycache__/
+*.py[cod]
 
 # Object files
 *.o
@@ -59,8 +67,15 @@ dkms.conf
 scripts/trace_analysis/*.csv
 trace_analysis/*.csv
 
-# Ghidra install and projects (scripts/setup_ghidra_linux.sh)
+# Ghidra install and generated project state (scripts/setup_ghidra_linux.sh)
 tools/
+*.gpr
+*.rep/
+*.lock
+*.ulock
+
+# Generated trace-analysis output; retain conclusions under notes/ instead
+scripts/trace_analysis/*.txt
 
 # driver-reference: copyrighted PreSonus/Windows files only (not .txt, etc.)
 driver-reference/pae_quantum.sys
