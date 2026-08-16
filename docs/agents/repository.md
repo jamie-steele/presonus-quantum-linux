@@ -12,7 +12,7 @@ primary known device is a Thunderbolt 3 interface exposed as PCI device `1c67:01
 | `notes/REGISTER_GUESSES.md` | Register hypotheses, confidence, and supporting observations. |
 | `notes/GHIDRA_FINDINGS_SUMMARY.md` | Consolidated static-analysis findings. |
 | `docs/REVERSE_ENGINEERING_PLAN.md` | Repeatable reverse-engineering plan. |
-| `docs/LINUX_TESTING_GUIDE.md` | Live Linux procedure; verify commands against current source before running. |
+| `docs/LINUX_TESTING.md` | Live Linux procedure; verify commands against current source before running. |
 | `README.md` | Public project overview; detailed status may lag the focused notes. |
 | `driver/README.md` | Driver build and usage overview; implementation descriptions may lag the C source. |
 
@@ -35,15 +35,18 @@ As of the consolidated status dated 2026-08-15 in `notes/CURRENT_STATUS.md`:
 
 - The module performs a bounded TCI mailbox startup and read-only readiness handshake for the
   verified `1c67:0104` device.
-- It exposes one fixed 48 kHz, 26-channel, S32_LE playback PCM with 128-frame periods and real
-  page-table DMA, IRQ, and hardware-position handling.
+- The repository source exposes one S32_LE duplex PCM with fixed 128-frame periods and recovered
+  native profiles: 26 channels at 44.1/48 kHz, 18 at 88.2/96 kHz, and 8 at 176.4/192 kHz. Only the
+  48 kHz/26-channel profile is live-proven; the new TCI rate setter remains offline-verified.
 - A five-second direct-ALSA silence run completed without an xrun and produced the exact expected
   interrupt count. Playback channels 1 and 2 were physically audible through headphone left/right.
 - `notes/CHANNEL_ROUTING.md` records the statically recovered analog, S/PDIF, and ADAT channel order.
 - WirePlumber publishes all 13 UCM playback sinks, and one bounded PipeWire Main stream completed
   with advancing DMA interrupts and a clean stop. YouTube playback through the desktop sink is
   physically audible through the connected headphones.
-- Capture, high sample rates, physical digital-output validation, and hot-removal behavior remain
-  unproven.
+- Direct ALSA capture and bounded PipeWire duplex operation are live-proven. WirePlumber publishes
+  all 26 inputs as independent mono sources, including a live-tested Line Input 5 binding.
+- Non-48 kHz profiles, physical digital-I/O validation, mixer controls, MIDI, and hot-removal
+  behavior remain unproven.
 
 Re-check these claims against current source and any newer evidence before changing the driver.

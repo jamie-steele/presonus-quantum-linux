@@ -58,8 +58,10 @@ family:
 | 176.4 / 192 kHz | 8 | 8 | None; analog 1-8 only |
 
 At 88.2/96 kHz the order is analog 1-8, S/PDIF 1-2, then ADAT 1-8. At
-176.4/192 kHz only the eight analog channels remain. The present Linux driver
-is fixed to 48 kHz and 26 channels; higher-rate rows are not yet exposed.
+176.4/192 kHz only the eight analog channels remain. The repository driver
+source now exposes these exact rate/channel pairs to ALSA and implements the
+recovered TCI rate setter, but only 48 kHz/26 channels are live-proven. The
+non-48 kHz rows must be treated as implemented, unverified hardware paths.
 
 ## Desktop mapping
 

@@ -8,7 +8,7 @@ Load this guide for edits under `driver/` or for claims about the current kernel
 2. `driver/snd-quantum2626.c`
 3. `notes/REGISTER_GUESSES.md` when changing MMIO behavior
 4. `driver/README.md` for the operator-facing build surface
-5. `docs/LINUX_TESTING_GUIDE.md` only when live testing is in scope
+5. `docs/LINUX_TESTING.md` only when live testing is in scope
 
 The C source wins when older prose describes the implementation differently. If a change makes a
 canonical status or usage document stale, update that document in the same slice when practical.
@@ -37,4 +37,3 @@ make -C driver
 Compilation requires matching kernel headers. A missing or mismatched host kernel build tree is an
 environment limitation, not a reason to alter driver behavior. Live verification is separately
 routed through `docs/agents/hardware-testing.md`.
-
