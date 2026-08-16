@@ -343,7 +343,7 @@ After finding register offsets:
 
 1. Document in `notes/REGISTER_GUESSES.md`
 2. Test on Linux using `snd-quantum2626` module
-3. Compare with Windows behavior (see `docs/WINDOWS_PROFILING.md`)
+3. Compare with Windows behavior (see `docs/WINDOWS_REGISTER_MONITORING.md`)
 4. Iterate and refine based on testing results
 
 ## Documentation Files

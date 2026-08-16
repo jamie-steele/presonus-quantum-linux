@@ -15,7 +15,7 @@ boundary unless the user explicitly asks for a live device test.
 4. Choose one bounded hypothesis and its expected observation. Do not combine unrelated register
    changes into one trial.
 
-Start with `docs/LINUX_TESTING_GUIDE.md` and the narrowest relevant helper under `scripts/`. Prefer
+Start with `docs/LINUX_TESTING.md` and the narrowest relevant helper under `scripts/`. Prefer
 card discovery from repository helpers over assuming a fixed ALSA card number.
 
 ## Evidence To Retain
@@ -34,4 +34,3 @@ Keep raw or large captures outside Git. Promote concise findings to `notes/CURRE
 Stop and report rather than widening the experiment when the device identity differs, the module
 cannot unload cleanly, the expected audio session cannot be restored, a register target is not the
 one reviewed, or a result would require a broad undocumented write sweep.
-

@@ -3,13 +3,14 @@
 This directory contains an experimental out-of-tree ALSA PCI driver for the
 locally verified PreSonus Quantum 2626 PCI function, `1c67:0104`.
 
-## Current duplex contract
+## Duplex contract
 
 The driver currently exposes one duplex PCM:
 
 - ALSA card ID `P2626`, device 0;
-- 48,000 Hz only;
-- 26 interleaved S32_LE channels;
+- 44.1/48 kHz with 26 interleaved S32_LE channels;
+- 88.2/96 kHz with 18 interleaved S32_LE channels;
+- 176.4/192 kHz with 8 interleaved S32_LE channels;
 - fixed 128-frame periods;
 - 2 through 64 periods per buffer.
 
@@ -20,8 +21,10 @@ five-second silence run completed with the exact expected 1,875 interrupts and
 no xrun. Playback channels 1 and 2 were physically audible through headphone
 left and right.
 
-Capture is live-proven with the same fixed geometry. Rate switching, physical
-S/PDIF/ADAT validation, and hot removal are not yet proven. WirePlumber
+Capture is live-proven at the 48 kHz/26-channel geometry. Native rate switching
+is implemented from the recovered TCI setter contract but has not yet been
+loaded or exercised on hardware; 48 kHz remains the control case. Physical
+S/PDIF/ADAT validation and hot removal are also unproven. WirePlumber
 discovers every UCM playback sink and capture source, and bounded PipeWire
 playback/capture concurrency completed cleanly. YouTube playback through the
 desktop path is physically audible on the connected headphones; read
