@@ -1,0 +1,37 @@
+schema_version: 1
+area: tasks
+description: Durable task registry for substantial Quantum2626 work.
+
+task_system:
+  guide: docs/agents/tasks/README.md
+  template: docs/agents/tasks/task-template.md
+
+tasks:
+  - id: TASK-001
+    title: TCI mailbox recovery from macOS traces
+    path: docs/agents/tasks/tci-mailbox-macos-trace-pivot.md
+    summary: Replace speculative Windows-register guessing with an evidence-backed TCI mailbox and Linux-native audio path derived from macOS behavior.
+    status: closed
+    load_when:
+      - investigating device initialization, command transport, clocking, DMA, or interrupts
+      - analyzing macOS DEXT behavior or m1n1 MMIO traces
+      - replacing the current experimental register-write path
+      - planning ALSA, PipeWire, JACK, latency, multichannel, or hot-removal validation
+
+  - id: TASK-002
+    title: Release performance hardening
+    path: docs/agents/tasks/release-performance-hardening.md
+    summary: Measure and improve desktop stability, startup behavior, latency, and shared duplex performance before release claims.
+    status: active
+    load_when:
+      - measuring latency, xruns, CPU load, IRQ cadence, or desktop audio stability
+      - tuning ALSA UCM, PipeWire, WirePlumber, dshare, or dsnoop performance
+      - investigating startup artifacts or playback disruption during capture transitions
+      - preparing performance or low-latency release claims
+
+maintenance:
+  - Search this index and existing task records before creating overlapping work.
+  - Start a focused task as one Markdown file under docs/agents/tasks/.
+  - Migrate a task to a same-named folder with its own index.yml only when it needs branches.
+  - A top-level task entry path may point to either the single Markdown record or the nested index.
+  - Keep closed tasks indexed as historical evidence; never silently reuse a closed task ID.
