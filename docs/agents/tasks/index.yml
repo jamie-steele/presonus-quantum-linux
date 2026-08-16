@@ -18,6 +18,17 @@ tasks:
       - replacing the current experimental register-write path
       - planning ALSA, PipeWire, JACK, latency, multichannel, or hot-removal validation
 
+  - id: TASK-002
+    title: Release performance hardening
+    path: docs/agents/tasks/release-performance-hardening.md
+    summary: Measure and improve desktop stability, startup behavior, latency, and shared duplex performance before release claims.
+    status: active
+    load_when:
+      - measuring latency, xruns, CPU load, IRQ cadence, or desktop audio stability
+      - tuning ALSA UCM, PipeWire, WirePlumber, dshare, or dsnoop performance
+      - investigating startup artifacts or playback disruption during capture transitions
+      - preparing performance or low-latency release claims
+
 maintenance:
   - Search this index and existing task records before creating overlapping work.
   - Start a focused task as one Markdown file under docs/agents/tasks/.

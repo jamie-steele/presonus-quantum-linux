@@ -1,9 +1,4 @@
 # PreSonus Quantum 2626 Linux driver
-# PreSonus Quantum 2626 Linux Driver
-
-Community-developed **Linux ALSA driver** for the **PreSonus Quantum 2626** Thunderbolt 3 audio interface. This open-source driver enables professional audio production on Linux with this high-performance 26×26 I/O interface.
-
-## Overview
 
 Experimental out-of-tree ALSA PCI driver for the PreSonus Quantum 2626
 Thunderbolt interface (`1c67:0104`). The project is based on static protocol
@@ -43,42 +38,17 @@ ALSA and normal desktop applications.
 - Playback and capture run concurrently through the shared hardware engine;
   bounded duplex tests completed without an xrun, DMA timeout, or stop failure.
 
-The current proven contract is fixed at 48 kHz. Other analog outputs and the
-physical S/PDIF/ADAT paths still need connected-hardware validation, and
-sample-rate switching is not implemented yet.
+The current live-proven contract remains fixed at 48 kHz. The repository source
+now implements native 44.1, 48, 88.2, 96, 176.4, and 192 kHz selection with the
+recovered 26/18/8-channel profiles, but that new clock-changing path has passed
+only offline build and static checks. Other analog outputs, physical S/PDIF/ADAT
+paths, and every non-48 kHz profile still need bounded hardware validation.
 
 The canonical evidence and current limitations are in
 [`notes/CURRENT_STATUS.md`](notes/CURRENT_STATUS.md). The exact channel layout
 is in [`notes/CHANNEL_ROUTING.md`](notes/CHANNEL_ROUTING.md).
 
 ## Build
-Getting the **PreSonus Quantum 2626** Thunderbolt 3 audio interface working on Linux with an out-of-tree ALSA PCI driver. This project provides Linux support for professional audio recording, music production, and low-latency audio processing.
-
-## Hardware Specifications
-
-- **Product:** PreSonus Quantum 2626 Thunderbolt Audio Interface  
-- **Connection:** Thunderbolt 3 (no USB or PCIe card version)  
-- **Audio Capabilities:** 26 inputs × 26 outputs, 24-bit/192 kHz resolution, <1 ms round-trip latency  
-- **Official Support:** macOS and Windows only (proprietary drivers)  
-- **Linux Support:** Community-developed ALSA driver (PCI ID 1c67:0104)
-- **Use Cases:** Professional audio recording, music production, live sound, DAW integration, low-latency audio processing
-
----
-
-## Development Status
-
-- **Driver Status:** ALSA card detection working, MSI interrupts operational, prepare/trigger functions implemented
-- **Register Programming:** DMA buffer address configuration (0x10300 playback / 0x10304 capture), control registers (0x100)
-- **Current Limitation:** Audio output not yet functional - requires additional reverse engineering of Windows driver
-- **Next Steps:** Complete register mapping for buffer size, sample rate configuration, and audio routing
-
-**Development Progress:** The driver successfully loads and creates an ALSA sound card. We're actively reverse-engineering the Windows driver using Ghidra to complete the register map for full audio functionality.
-
----
-
-## Installation and Quick Start
-
-### Building the Driver
 
 ```bash
 make -C driver
@@ -119,9 +89,14 @@ establish a fresh test boundary before running them.
 
 - Only the Quantum 2626 PCI ID is enabled; related Quantum models are not
   claimed or probed by this driver.
-- Playback is fixed to 48 kHz and 26 channels internally. Applications should
-  use the UCM stereo endpoints or intentionally provide a full raw frame.
-- No mixer controls, MIDI, high-rate profile, or hot-removal proof exists yet.
+- The tracked UCM desktop profile remains fixed to the live-proven 48 kHz,
+  26-channel layout. Direct ALSA/DAW use of the new native-rate source requires
+  the matching full raw frame: 26 channels at 44.1/48, 18 at 88.2/96, and 8 at
+  176.4/192 kHz.
+- No mixer controls, MIDI, live-proven high-rate profile, or hot-removal proof
+  exists yet.
+- End-to-end latency and release-performance tuning are not complete; no sub-millisecond or
+  professional real-time performance claim is made yet.
 - Capture is live-proven at 48 kHz through direct ALSA and PipeWire duplex tests.
 - ADAT routing is statically identified, not physically confirmed on Linux.
 

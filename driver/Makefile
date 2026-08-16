@@ -7,6 +7,7 @@ obj-m := snd-quantum2626.o
 KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 UCM2_DIR ?= /usr/share/alsa/ucm2
+WIREPLUMBER_MAIN_LUA_DIR ?= /usr/share/wireplumber/main.lua.d
 
 all:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
@@ -27,6 +28,13 @@ install-ucm:
 		../alsa/ucm2/conf.d/snd-quantum2626/snd-quantum2626.conf \
 		$(DESTDIR)$(UCM2_DIR)/conf.d/snd-quantum2626/snd-quantum2626.conf
 
-install: install-module install-ucm
+install-wireplumber:
+	install -D -m 0644 \
+		../alsa/wireplumber/51-quantum2626.lua \
+		$(DESTDIR)$(WIREPLUMBER_MAIN_LUA_DIR)/51-quantum2626.lua
 
-.PHONY: all clean install install-module install-ucm
+install-audio: install-ucm install-wireplumber
+
+install: install-module install-audio
+
+.PHONY: all clean install install-module install-ucm install-wireplumber install-audio

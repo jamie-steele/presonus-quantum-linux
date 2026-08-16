@@ -52,9 +52,14 @@ to survive software teardown remains unresolved.
 | `0x33` get clock source | `0x36` | response: one clock-source `u32` |
 | `0x3b` get power state | `0x3c` | response: `u32`, restricted to `0` or `1` |
 
-Additional statically identified commands are `0x32` set sample rate, `0x34` set clock source,
-`0x38` set serial number, `0x39` get serial number, and `0x3d` get latency. They are not needed for
-the first read-only Linux control proof.
+The statically recovered sample-rate setter uses request `0x32`. Its eight-byte payload is the
+clock-source wire enum followed by the sample-rate wire enum, both little-endian `u32`. It expects
+control response code `0x01` with one little-endian `u32` status; zero is success. The vendor path
+stops DMA and frees its DMA resources before issuing the setter, then reads the rate back. This is
+static-analysis evidence from the exact x86_64 DriverKit slice, not yet an observed Linux write.
+
+Additional statically identified commands are `0x34` set clock source, `0x38` set serial number,
+`0x39` get serial number, and `0x3d` get latency.
 
 Sample-rate enum values are `1=44100`, `2=48000`, `3=88200`, `4=96000`, `5=176400`, and
 `6=192000`; zero means no valid rate.
@@ -72,7 +77,8 @@ Sample-rate enum values are `1=44100`, `2=48000`, `3=88200`, `4=96000`, `5=17640
 
 ## Current Linux Boundary
 
-The driver starts TCI and performs only the three queries above during probe, each with a 250 ms
-timeout. The separately implemented playback PCM depends on this read-only probe reaching 48 kHz.
-A successful compile is not hardware proof; live values belong in `notes/CURRENT_STATUS.md` and the
-active task only after a bounded module load.
+The driver starts TCI and performs the three queries above during probe, each with a 250 ms timeout.
+The repository source now also implements the bounded `0x32` setter, status check, sample-rate
+read-back, and rate-dependent channel-register check for ALSA `hw_params`; no installed or loaded
+module has exercised that write. A successful compile is not hardware proof; live values belong in
+`notes/CURRENT_STATUS.md` and the active task only after a bounded module load.
