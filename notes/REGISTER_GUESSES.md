@@ -1,85 +1,72 @@
-# Register guesses (from Ghidra / reverse-engineering)
+# Quantum 2626 Register Evidence
 
-Fill in as you identify MMIO offsets from `pae_quantum.sys` or experimentation.
+This table supersedes the earlier Windows-first guesses. Evidence recovered by decompiling a
+vendor binary is labeled **static analysis** and is not a live Linux observation.
 
-## Initial Register Reads (from FUN_140003d60)
+## TCI Mailbox — Static Analysis
 
-Found in `FUN_140003d60` after `MmMapIoSpace` call. These registers are read during device initialization.
+| Offset | Direction | Meaning |
+|---:|---|---|
+| `0x0070` | read | TCI DMA status; stop waits for bits `0x10001` to clear |
+| `0x0074` | read | TX device/consumer position |
+| `0x0078` | read | RX device/producer position |
+| `0x007c` | read | configuration: low byte slot count, upper 16 bits slot size |
+| `0x0080 + 4*n` | read | RX message length for slot `n` |
+| `0x1000` | write | TCI DMA control: `0x101` start, `0` stop |
+| `0x1004` | read/write | TX host/producer position |
+| `0x1008` | read/write | RX host/consumer position |
+| `0x1010/0x1014 + 8*n` | write | TX slot DMA address low/high |
+| `0x1090 + 4*n` | write | TX message length for slot `n` |
+| `0x10d0/0x10d4 + 8*n` | write | RX slot DMA address low/high |
 
-| Offset | Suspected role | Source / notes |
-|--------|----------------|----------------|
-| 0x0    | Version/ID register | Read immediately after MMIO mapping, stored at param_1+0x4f0 |
-| 0x4    | Status/Control | Read during init, stored at param_1+0x4f4 |
-| 0x8    | Status/Control | Read during init, stored at param_1+0x4f8 |
-| 0x10   | Status/Control | Read during init, stored at param_1+0x4fc |
-| 0x14   | Status/Control | Read during init, stored at param_1+0x500 |
-| 0x104  | Status/Control | Read during init, stored at param_1+0x1d8 |
-| 0x10300| Buffer/Channel register | Large offset, likely per-channel or buffer related, stored at param_1+0x1d0 |
-| 0x10304| Buffer/Channel register | Large offset, likely per-channel or buffer related, stored at param_1+0x1d4 |
+## Interrupts — Static Analysis
 
-## Register Writes (from FUN_140002e30)
+| Offset | Meaning |
+|---:|---|
+| `0x10004` | interrupt status and write-one-to-clear acknowledgement |
+| `0x11004` | interrupt mask; vendor code uses an in-memory shadow and exact writes, not MMIO read-modify-write |
+| bit `8` | audio DMA interrupt |
+| bit `31` | TCI RX interrupt |
 
-| Offset | Hex | Value | Purpose | Function |
-|--------|-----|-------|---------|----------|
-| 0x100  | 0x100 | 0x8 | Control register? | FUN_140002e30 |
+## Audio DMA — Static Analysis And Initial Linux Implementation
 
-**Note:** Found via scalar search. Assembly shows `MOV [RSI + 0x100], 0x8`. Decompiler shows `*(param_1 + 0x20) = 8`, suggesting structure offset.
+| Offset | Meaning |
+|---:|---|
+| `0x10000` | stop-status; stop waits for low two bits to clear |
+| `0x10104` | packed DMA position: low 20 bits are frame offset within the buffer; high 12 bits are the wrapping buffer-cycle counter |
+| `0x10200` | low byte capture channel count, next byte playback channel count |
+| `0x10300` | record addresses per segment; read-only geometry |
+| `0x10304` | playback addresses per segment; read-only geometry |
+| `0x10308` | record/playback page-table fetch status |
+| `0x11000` | main audio DMA control: `3` start, `0` stop |
+| `0x11100/0x11104` | record page-table address low/high |
+| `0x11108` | record DMA buffer length in frames |
+| `0x1110c` | record hardware block length in frames; 128 at the current 48 kHz baseline |
+| `0x11110/0x11114` | playback page-table address low/high |
+| `0x11118` | playback DMA buffer length in frames |
+| `0x1111c` | playback hardware block length in frames; 128 at the current 48 kHz baseline |
 
-## MMIO Base Address Storage
+Page tables consist of 4 KiB coherent pages containing little-endian 64-bit entries. Data entries
+are `DMA page address | 1`; when another table page follows, the next entry after the device-reported
+data-entry count is `next table page address | 1`. The current Linux slice expresses this layout
+directly. The second bounded silence run reached page status `0x00000101`, raised bit-8 interrupts,
+and captured transient nonzero `0x10104` values such as `0x00400003` and `0x00a00001`.
 
-- MMIO base address stored at: `param_1 + 0xc8` (200 decimal)
-- Access pattern: `*(longlong *)(param_1 + 200) + offset`
+**Observed Linux, 2026-08-15:** the local `1c67:0104` reports 15 record and 15 playback addresses per
+segment. `0x10200 = 0x00001a1a`, confirming 26 channels in both directions.
 
-## Register Writes Found
+## Legacy Identity Reads
 
-| Offset | Value | Function | Notes |
-|--------|-------|----------|-------|
-| 0x100  | 0x8   | FUN_140002e30 | Control register - write 0x8 to start/enable |
+Offsets `0x0000`, `0x0004`, `0x0008`, `0x0010`, `0x0014`, and `0x0104` are read during vendor
+initialization. Their detailed bit fields remain unknown. Earlier claims that `0x0100` was the main
+stream control and that `0x10300`/`0x10304` accepted ALSA buffer addresses are retired.
 
-**Note:** Found 50 instances of offset 0x100 in code, suggesting it's a key control register.
+## Remaining Questions
 
-## Analysis Status
-
-**Ghidra Analysis Completed:**
-- ✅ Found 9 confirmed register offsets
-- ✅ Identified 44+ functions using MMIO
-- ✅ Found interrupt setup (IoConnectInterruptEx in FUN_140003d60)
-- ✅ Traced MMIO base usage (112+ references to offset 0xc8)
-
-**Still Missing:**
-- ❌ Format/sample rate registers (not found as literals - may be calculated)
-- ❌ Control register bit fields (need to analyze 0x100 register in detail)
-- ❌ Hardware position register (0x0104 is placeholder, needs verification)
-- ❌ Interrupt handler function (need to trace from IoConnectInterruptEx)
-
-## Functions Using MMIO
-
-From comprehensive analysis, 75+ functions use MMIO. Key functions:
-- `FUN_140003d60` - MMIO mapping and initialization (reads: 0x0, 0x4, 0x8, 0x10, 0x14, 0x104, 0x10300, 0x10304)
-- `FUN_140002e30` - Control register write (0x100 = 0x8)
-- Many other functions access MMIO base + offsets
-
-## Analysis Status
-
-✅ **Completed:**
-- Found MMIO base storage location (offset 0xc8 in device structure)
-- Identified 8+ register offsets from initialization function
-- Found control register write pattern
-- Identified 75+ functions using MMIO
-
-⏳ **In Progress:**
-- Comprehensive register search (finding many offsets, need to filter for actual MMIO)
-- Sample rate/format register discovery
-- Interrupt handler analysis
-
-## Next Steps
-
-1. **Filter register search results** - Many offsets found, need to identify which are actual MMIO vs stack
-2. **Find format/sample rate registers** - Search for where sample rate values (44100, 48000) are written
-3. **Analyze interrupt handler** - Find function connected via `IoConnectInterruptEx`
-4. **Find position register** - Search for counter/position operations
-5. **Control register bit fields** - Analyze 0x100 register to understand bit meanings
-
-## Baseline Comparison
-
-Baseline at load: `notes/MMIO_BASELINE.md`. During playback (with `dump_on_trigger=1`): `notes/MMIO_during_playback_*.txt`.
+- Whether the low 24 bits of each live-proven S32_LE container carry left-justified or
+  right-justified 24-bit converter data; normal ALSA-generated S32_LE playback is audible.
+- Physical confirmation of the statically recovered Line, S/PDIF, and ADAT output order. See
+  `notes/CHANNEL_ROUTING.md` for the exact vendor tables and current Linux mapping.
+- Whether the one-sided page-fetch timeout after 369 rapid xrun recovery cycles is fully explained
+  by the now-corrected buffer-position accounting; the later bounded run no longer stormed.
+- Whether any model- or firmware-specific TCI differences exist for `1c67:0104`.

@@ -60,6 +60,30 @@ analyzeHeadless <project_path> <project_name> -process pae_quantum.sys -script f
 unknown writes into the driver or probe them live without reconciling them with the TCI mailbox
 contract in `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md`.
 
+### 5. `ExportNamedFunctions.java`
+
+Exports disassembly and decompiled C for functions whose names contain caller-supplied fragments.
+It is useful for modern C++ DriverKit binaries where symbols survive and the older Python scripts
+target Windows APIs. Always choose an output path outside the repository for proprietary results.
+
+```bash
+analyzeHeadless <project-dir> <project-name> -process <program> \
+  -scriptPath scripts/ghidra \
+  -postScript ExportNamedFunctions.java /tmp/quantum-functions.txt CmdMsgIntf QuantumDevice
+```
+
+### 6. `ExportNamedData.java`
+
+Exports a bounded little-endian qword view of named data symbols, resolving in-image pointers to
+symbol names and printable strings where possible. Use it for model/channel/rate tables whose
+symbols survived stripping. Keep proprietary output outside the repository.
+
+```bash
+analyzeHeadless <project-dir> <project-name> -process <program> \
+  -scriptPath scripts/ghidra \
+  -postScript ExportNamedData.java /tmp/quantum-data.txt 0x200 Quantum2626Channel
+```
+
 ## Quick Start
 
 ### Option 1: Run in Ghidra GUI

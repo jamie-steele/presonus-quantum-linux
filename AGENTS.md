@@ -48,4 +48,5 @@ under `docs/agents/`.
 - Driver changes: `docs/agents/driver-development.md`
 - Reverse engineering: `docs/agents/reverse-engineering.md`
 - Live Linux/device testing: `docs/agents/hardware-testing.md`
+- ALSA/PipeWire/JACK integration: `docs/agents/desktop-audio.md`
 - Durable tasks: `docs/agents/tasks/index.yml`

@@ -21,6 +21,7 @@ primary known device is a Thunderbolt 3 interface exposed as PCI device `1c67:01
 | Path | Purpose |
 | --- | --- |
 | `driver/` | Out-of-tree ALSA PCI driver source and kernel-module build. |
+| `alsa/` | UCM desktop routing for the currently proven playback geometry. |
 | `driver-reference/` | Local Windows driver reference material and metadata; proprietary binaries are ignored. |
 | `scripts/ghidra/` | Ghidra analysis scripts and selected analysis outputs. |
 | `scripts/` | Linux device tests, Windows collection, and reverse-engineering helpers. |
@@ -30,11 +31,19 @@ primary known device is a Thunderbolt 3 interface exposed as PCI device `1c67:01
 
 ## Current State
 
-As of the consolidated status dated 2026-02-05 in `notes/CURRENT_STATUS.md`:
+As of the consolidated status dated 2026-08-15 in `notes/CURRENT_STATUS.md`:
 
-- The module probes the device, maps BAR0, registers ALSA PCM, and obtains an IRQ path.
-- The current source contains experimental initialization, DMA-address, and stream-control writes.
-- The device has not reached a confirmed ready state and no audio has been produced.
-- The complete initialization, routing, DMA, and interrupt-status contracts remain unconfirmed.
+- The module performs a bounded TCI mailbox startup and read-only readiness handshake for the
+  verified `1c67:0104` device.
+- It exposes one fixed 48 kHz, 26-channel, S32_LE playback PCM with 128-frame periods and real
+  page-table DMA, IRQ, and hardware-position handling.
+- A five-second direct-ALSA silence run completed without an xrun and produced the exact expected
+  interrupt count. Playback channels 1 and 2 were physically audible through headphone left/right.
+- `notes/CHANNEL_ROUTING.md` records the statically recovered analog, S/PDIF, and ADAT channel order.
+- WirePlumber publishes all 13 UCM playback sinks, and one bounded PipeWire Main stream completed
+  with advancing DMA interrupts and a clean stop. YouTube playback through the desktop sink is
+  physically audible through the connected headphones.
+- Capture, high sample rates, physical digital-output validation, and hot-removal behavior remain
+  unproven.
 
 Re-check these claims against current source and any newer evidence before changing the driver.

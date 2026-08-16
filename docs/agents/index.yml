@@ -69,6 +69,20 @@ entries:
       - reverse-engineering
     status: current
 
+  - id: desktop-audio
+    title: ALSA and desktop audio integration
+    path: docs/agents/desktop-audio.md
+    summary: Defines UCM, PipeWire, JACK, channel-map, and shared-PCM integration boundaries.
+    load_when:
+      - changing files under alsa or adding user-facing PCM mappings
+      - integrating the driver with PipeWire, WirePlumber, or JACK
+      - exposing analog, S/PDIF, or ADAT endpoints to desktop applications
+    related:
+      - repository-map
+      - driver-development
+      - hardware-testing
+    status: current
+
   - id: tasks-index
     title: Durable task index
     path: docs/agents/tasks/index.yml

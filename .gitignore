@@ -5,6 +5,10 @@
 # Prerequisites
 *.d
 
+# ALSA UCM uses conf.d as a real configuration directory, not a dependency file.
+!alsa/ucm2/conf.d/
+!alsa/ucm2/conf.d/**
+
 # Python cache files
 __pycache__/
 *.py[cod]
