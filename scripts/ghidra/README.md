@@ -56,7 +56,33 @@ analyzeHeadless <project_path> <project_name> -process pae_quantum.sys -script f
 
 **Usage:** Run in Ghidra GUI (Scripts > Run Script) or headless with `-postScript trace_stream_start_writes.py`. Output appears in the script directory.
 
-**Use for Linux:** Paste the ordered list into the driver’s prepare/trigger path, or try unknown offsets/values via module params (`reg_write_offset`, `reg_write_value`, etc.).
+**Use for Linux:** Treat the ordered list as corroborating static-analysis evidence. Do not paste
+unknown writes into the driver or probe them live without reconciling them with the TCI mailbox
+contract in `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md`.
+
+### 5. `ExportNamedFunctions.java`
+
+Exports disassembly and decompiled C for functions whose names contain caller-supplied fragments.
+It is useful for modern C++ DriverKit binaries where symbols survive and the older Python scripts
+target Windows APIs. Always choose an output path outside the repository for proprietary results.
+
+```bash
+analyzeHeadless <project-dir> <project-name> -process <program> \
+  -scriptPath scripts/ghidra \
+  -postScript ExportNamedFunctions.java /tmp/quantum-functions.txt CmdMsgIntf QuantumDevice
+```
+
+### 6. `ExportNamedData.java`
+
+Exports a bounded little-endian qword view of named data symbols, resolving in-image pointers to
+symbol names and printable strings where possible. Use it for model/channel/rate tables whose
+symbols survived stripping. Keep proprietary output outside the repository.
+
+```bash
+analyzeHeadless <project-dir> <project-name> -process <program> \
+  -scriptPath scripts/ghidra \
+  -postScript ExportNamedData.java /tmp/quantum-data.txt 0x200 Quantum2626Channel
+```
 
 ## Quick Start
 
@@ -94,7 +120,7 @@ Optional env vars: `GHIDRA_INSTALL_DIR`, `DRIVER_BIN`, `GHIDRA_PROJECT_DIR`, `GH
 
 ```powershell
 # Set paths
-$ghidra = "C:\Users\Jamie\Ghidra\ghidra_12.0.2_PUBLIC"
+$ghidra = "C:\Tools\ghidra_12.0.2_PUBLIC"
 $project = "$env:USERPROFILE\ghidra_projects"
 $projectName = "Quantum2626_Driver"
 
@@ -103,7 +129,7 @@ $projectName = "Quantum2626_Driver"
     $project `
     $projectName `
     -process pae_quantum.sys `
-    -scriptPath "C:\source\quantum\.git\presonus-quantum2626-linux\scripts\ghidra" `
+    -scriptPath "C:\source\Quantum2626\scripts\ghidra" `
     -postScript find_mmio_registers.py
 ```
 
@@ -158,5 +184,5 @@ Scripts can export results to JSON files for further processing:
 After running these scripts:
 1. Review the register map
 2. Correlate with Linux MMIO baseline (`notes/MMIO_BASELINE.md`)
-3. Test register accesses on Linux using module parameters
-4. Implement driver functions based on discovered registers
+3. Classify each result as a mailbox, DMA, corroborated non-mailbox, or unproven structure access
+4. Implement only behavior supported by the TCI task's evidence and live-test boundaries

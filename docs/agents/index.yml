@@ -1,0 +1,97 @@
+schema_version: 1
+area: root
+entries:
+  - id: agent-docs-contract
+    title: Agent documentation contract
+    path: docs/agents/README.md
+    summary: Defines progressive loading, index structure, source precedence, and maintenance rules.
+    load_when:
+      - changing AGENTS.md, agent guidance, or an agent index
+      - deciding where durable repository knowledge belongs
+    related:
+      - repository-map
+      - tasks-index
+    status: current
+
+  - id: repository-map
+    title: Repository map and source precedence
+    path: docs/agents/repository.md
+    summary: Routes the driver, reverse-engineering material, scripts, notes, and current status.
+    load_when:
+      - orienting in the repository
+      - deciding which document or source owns a technical claim
+      - investigating conflicting status descriptions
+    related:
+      - driver-development
+      - reverse-engineering
+      - hardware-testing
+    status: current
+
+  - id: driver-development
+    title: Linux driver development
+    path: docs/agents/driver-development.md
+    summary: Defines the source paths, safety boundaries, and verification sequence for driver edits.
+    load_when:
+      - changing driver/snd-quantum2626.c or driver/Makefile
+      - changing PCI, ALSA, DMA, IRQ, MMIO, PCM, or module-parameter behavior
+      - reviewing a driver implementation claim
+    related:
+      - repository-map
+      - reverse-engineering
+      - hardware-testing
+    status: current
+
+  - id: reverse-engineering
+    title: Reverse-engineering workflow
+    path: docs/agents/reverse-engineering.md
+    summary: Routes Ghidra, Windows-driver, register, and trace work while preserving evidence quality.
+    load_when:
+      - analyzing the Windows driver or Ghidra output
+      - changing scripts/ghidra or register notes
+      - proposing or confirming MMIO register behavior
+    related:
+      - repository-map
+      - driver-development
+      - hardware-testing
+    status: current
+
+  - id: hardware-testing
+    title: Live Linux and device testing
+    path: docs/agents/hardware-testing.md
+    summary: Defines the approval boundary and evidence requirements for kernel and hardware tests.
+    load_when:
+      - building for the current kernel and loading the module
+      - running playback, capture, interrupt, LED, or MMIO experiments
+      - collecting live Linux device evidence
+    related:
+      - repository-map
+      - driver-development
+      - reverse-engineering
+    status: current
+
+  - id: desktop-audio
+    title: ALSA and desktop audio integration
+    path: docs/agents/desktop-audio.md
+    summary: Defines UCM, PipeWire, JACK, channel-map, and shared-PCM integration boundaries.
+    load_when:
+      - changing files under alsa or adding user-facing PCM mappings
+      - integrating the driver with PipeWire, WirePlumber, or JACK
+      - exposing analog, S/PDIF, or ADAT endpoints to desktop applications
+    related:
+      - repository-map
+      - driver-development
+      - hardware-testing
+    status: current
+
+  - id: tasks-index
+    title: Durable task index
+    path: docs/agents/tasks/index.yml
+    summary: Routes substantial work and supports both single-file and nested task records.
+    load_when:
+      - starting or resuming multi-session, risky, or discovery-heavy work
+      - recording decisions, validation, blockers, or handoff state
+      - splitting a growing task into focused branches
+    related:
+      - agent-docs-contract
+      - repository-map
+    status: current

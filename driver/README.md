@@ -1,77 +1,77 @@
-# PreSonus Quantum 2626 — Linux driver (skeleton)
+# PreSonus Quantum 2626 Linux driver
 
-Out-of-tree ALSA PCI driver skeleton for PreSonus Quantum 2626 (and family: 0101, 0102, 0103, 0105 from `driver-reference/pae_quantum.inf`). The card is registered and a PCM device appears. **IRQ path is wired:** the driver requests the device IRQ and calls `snd_pcm_period_elapsed()` from the interrupt handler for active playback/capture; if IRQ request fails, a timer fallback drives the pointer. **No actual hardware I/O yet** — no DMA or register programming; real playback/capture needs reverse engineering of `pae_quantum.sys` or the device BAR.
+This directory contains an experimental out-of-tree ALSA PCI driver for the
+locally verified PreSonus Quantum 2626 PCI function, `1c67:0104`.
 
-## Base / references
+## Duplex contract
 
-- **Kernel:** [Writing an ALSA Driver](https://docs.kernel.org/sound/kernel-api/writing-an-alsa-driver.html) (Takashi Iwai).
-- **Structure:** `sound/pci/ens1370.c` (Ensoniq AudioPCI) — PCI table, probe/remove, chip create, PCM registration.
-- **IDs:** `driver-reference/pae_quantum.inf`; Linux PCI baseline in `notes/DIAGNOSIS_RESULT.md` (1c67:0104, BAR 0 = 1 MiB).
+The driver currently exposes one duplex PCM:
 
-## What this driver does
+- ALSA card ID `P2626`, device 0;
+- 44.1/48 kHz with 26 interleaved S32_LE channels;
+- 88.2/96 kHz with 18 interleaved S32_LE channels;
+- 176.4/192 kHz with 8 interleaved S32_LE channels;
+- fixed 128-frame periods;
+- 2 through 64 periods per buffer.
 
-- **PCI:** Claims 1c67:0101, 0102, 0103, 0104, 0105.
-- **Probe:** Enables device, requests regions, maps BAR 0 with `pci_iomap`, logs the first 64 bytes of BAR 0 (MMIO+0x00..0x3c) to dmesg for reverse-engineering, tries MSI first (Thunderbolt often has legacy IRQ 0), then requests the device IRQ when valid (>0) with a shared handler that signals period elapsed for active substreams, creates ALSA card + one PCM (playback + capture), registers card.
-- **Remove / free:** Frees IRQ (if requested), frees MSI vectors (if allocated), unmaps BAR, releases regions, disables PCI.
-- **PCM:** Open/close/hw_params/hw_free/prepare/trigger/pointer; hardware descriptor allows common rates/channels so the device shows in `aplay -l` / `arecord -l`. Pointer is driven by IRQ (or timer fallback). No data is moved to/from hardware yet.
+It performs the recovered TCI mailbox startup, builds the vendor-style DMA
+page tables, programs the full-buffer and 128-frame block lengths, handles the
+real audio IRQ, and reports the packed hardware position to ALSA. A bounded
+five-second silence run completed with the exact expected 1,875 interrupts and
+no xrun. Playback channels 1 and 2 were physically audible through headphone
+left and right.
 
-## Build and load
+Capture is live-proven at the 48 kHz/26-channel geometry. Native rate switching
+is implemented from the recovered TCI setter contract but has not yet been
+loaded or exercised on hardware; 48 kHz remains the control case. Physical
+S/PDIF/ADAT validation and hot removal are also unproven. WirePlumber
+discovers every UCM playback sink and capture source, and bounded PipeWire
+playback/capture concurrency completed cleanly. YouTube playback through the
+desktop path is physically audible on the connected headphones; read
+`../notes/CURRENT_STATUS.md` for the exact evidence before another live test.
+
+## Build
 
 ```bash
-cd driver
 make
-sudo insmod snd-quantum2626.ko
 ```
 
-Or install and load via modprobe:
+Equivalent kernel command:
 
 ```bash
-make install
+make -C /lib/modules/$(uname -r)/build M=$PWD W=1 modules
+```
+
+## Install
+
+`make install` installs both the module and the UCM desktop-routing profile:
+
+```bash
+sudo make install
 sudo modprobe snd-quantum2626
 ```
 
-**For testing with debug output:**
-```bash
-sudo insmod snd-quantum2626.ko dump_on_trigger=1
-```
+The narrower `install-module` and `install-ucm` targets are available for
+packaging. `DESTDIR` and `UCM2_DIR` may override the UCM staging destination;
+the kernel build's normal `INSTALL_MOD_PATH` controls module staging.
 
-**Quick status check:**
-```bash
-../scripts/linux_test_driver.sh
-```
+Loading the module starts the TCI control path and binds the PCI function.
+Treat module load/unload, desktop-audio restart, and playback as live hardware
+tests; use the approval and evidence procedure in
+`../docs/agents/hardware-testing.md`.
 
-Check:
+## Playback routing
 
-```bash
-aplay -l
-arecord -l
-cat /proc/asound/cards
-```
+The raw multichannel PCM is `hw:P2626,0` in both directions. The UCM files in `../alsa/` expose a
+normal Main stereo endpoint plus Line 3-4, Line 5-6, Line 7-8, S/PDIF 1-2, and
+ADAT 1-16 as stereo pairs sharing the same hardware stream. Matching mono input
+sources independently expose Mic/Instrument 1-2, Line 3-8, S/PDIF 1-2, and
+ADAT 1-16. See
+`../notes/CHANNEL_ROUTING.md` for the complete zero-based binding table.
 
-Unload:
+## Debug module parameters
 
-```bash
-sudo rmmod snd-quantum2626
-```
-
-### Optional: dump MMIO at prepare/trigger (for reverse-engineering)
-
-Load with `dump_on_trigger=1` to log the first 64 bytes of BAR 0 at each `prepare` and `trigger START/STOP`:
-
-```bash
-sudo modprobe snd-quantum2626 dump_on_trigger=1
-```
-
-Then run `aplay` or `arecord`; `dmesg` will show "MMIO at prepare", "MMIO at trigger START", "MMIO at trigger STOP". Compare with baseline (see `docs/REVERSE_ENGINEERING_PLAN.md` and `scripts/probe_during_playback.sh`).
-
-## Next steps (real audio)
-
-1. **IRQ:** Done. Handler runs and signals period elapsed; use dmesg to confirm IRQ is firing (or that timer fallback is used). Later: read a status register in the handler and only signal when the device actually reports a period (reverse-engineer BAR layout).
-2. **PCM:** Implement prepare/trigger/pointer to program the device’s DMA/buffers and report the real hardware pointer; use `chip->iobase` and the MMIO dump (dmesg after load) to infer register layout from `pae_quantum.sys` or experimentation.
-3. **Format/channels:** Adjust `quantum_pcm_hw` and constraints from device capabilities (e.g. 26 I/O from specs; may require multiple PCMs or channel maps).
-
-## Layout
-
-- `snd-quantum2626.c` — Single-file driver (PCI table, probe/remove, chip, stub PCM).
-- `Makefile` — Out-of-tree kernel build.
-- `README.md` — This file.
+The source retains narrow reverse-engineering parameters for single register
+reads/writes and a small MMIO scan. They are not ordinary operating controls.
+Do not use a write or scan parameter without an explicitly scoped hardware
+experiment grounded in current register evidence.

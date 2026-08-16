@@ -1,7 +1,12 @@
 # Pure Scripting Status - Format Register Analysis
 
-**Date:** 2026-02-03  
-**Status:** Infrastructure complete, execution needs refinement
+**Date:** 2026-02-03
+**Status:** Historical; superseded by `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md`
+
+This record describes an earlier Windows-first experiment. The broken alternative PyGhidra
+launchers and their failure logs were removed during repository cleanup on 2026-08-15. Use
+`scripts/run_ghidra_analysis.sh` for retained headless analysis, and treat Windows findings as
+corroboration for the TCI-first task rather than the primary implementation path.
 
 ## What We've Built
 
@@ -88,7 +93,7 @@ Then check:
 
 **Try Option 4 (Windows Capture) first** - it's the fastest way to get results:
 1. Play audio at 44100 Hz, capture registers
-2. Play audio at 48000 Hz, capture registers  
+2. Play audio at 48000 Hz, capture registers
 3. Compare to find which register changes
 
 Then use Ghidra to understand the full programming sequence.
@@ -97,4 +102,3 @@ Then use Ghidra to understand the full programming sequence.
 
 - `scripts/ghidra/find_format_registers.py` - Main analysis script
 - `scripts/ghidra/run_format_analysis.ps1` - PowerShell runner
-- `scripts/ghidra/run_format_analysis_direct.py` - Alternative Python runner (needs API fix)
