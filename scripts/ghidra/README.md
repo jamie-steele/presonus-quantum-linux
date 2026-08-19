@@ -136,7 +136,7 @@ $projectName = "Quantum2626_Driver"
 ### Option 4: Run All Scripts
 
 ```powershell
-cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts\ghidra
+cd C:\source\quantum\.git\presonus-quantum-linux\scripts\ghidra
 .\run_all_analysis.ps1
 ```
 

@@ -1,7 +1,12 @@
 # Repository Map And Source Precedence
 
-Quantum2626 develops an out-of-tree Linux ALSA PCI driver for the PreSonus Quantum 2626. The
-primary known device is a Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
+PreSonus Quantum Linux aims to support the full Quantum interface family over time. The current
+out-of-tree Linux ALSA PCI driver is enabled and hardware-tested only for the Quantum 2626, a
+Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
+
+The public family roadmap and support claims live in the support matrix in `README.md`. Treat the
+PCI table in `driver/snd-quantum2626.c` and hardware evidence in `notes/CURRENT_STATUS.md` as the
+authority for what is actually enabled and proven.
 
 ## Source Precedence
 

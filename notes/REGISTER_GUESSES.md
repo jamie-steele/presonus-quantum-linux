@@ -63,8 +63,11 @@ stream control and that `0x10300`/`0x10304` accepted ALSA buffer addresses are r
 
 ## Remaining Questions
 
-- Whether the low 24 bits of each live-proven S32_LE container carry left-justified or
-  right-justified 24-bit converter data; normal ALSA-generated S32_LE playback is audible.
+- **Resolved by static analysis, 2026-08-16:** the vendor HAL publishes linear PCM as signed,
+  interleaved, 24 significant bits aligned high in a 32-bit container. The Linux DMA transport's
+  S32_LE format is therefore the correct container. The Linux source now reports the
+  vendor-confirmed 24-bit MSB precision through `snd_pcm_hw_constraint_msbits()`; live installation
+  and read-back remain pending.
 - Physical confirmation of the statically recovered Line, S/PDIF, and ADAT output order. See
   `notes/CHANNEL_ROUTING.md` for the exact vendor tables and current Linux mapping.
 - Whether the one-sided page-fetch timeout after 369 rapid xrun recovery cycles is fully explained

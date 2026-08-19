@@ -6,7 +6,7 @@ Since headless mode requires PyGhidra setup, run the scripts in the Ghidra GUI i
 
 1. **Open Ghidra:**
    ```powershell
-   cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts
+   cd C:\source\quantum\.git\presonus-quantum-linux\scripts
    .\ghidra_analyze_driver.ps1
    ```
 
@@ -18,7 +18,7 @@ Since headless mode requires PyGhidra setup, run the scripts in the Ghidra GUI i
 3. **Run the script:**
    - Window > Python (or Window > Script Manager)
    - Click the folder icon to browse scripts
-   - Navigate to: `C:\source\quantum\.git\presonus-quantum2626-linux\scripts\ghidra`
+   - Navigate to: `C:\source\quantum\.git\presonus-quantum-linux\scripts\ghidra`
    - Select: `find_mmio_registers.py`
    - Click "Run Script"
 
