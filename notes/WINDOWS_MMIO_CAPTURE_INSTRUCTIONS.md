@@ -11,7 +11,7 @@
 **Run PowerShell as Administrator**, then:
 
 ```powershell
-cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts
+cd C:\source\quantum\.git\presonus-quantum-linux\scripts
 
 # Capture baseline (idle)
 .\windows_capture_register_activity.ps1 -OutputFile quantum_baseline.etl -DurationSeconds 5
