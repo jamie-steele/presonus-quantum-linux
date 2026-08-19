@@ -12,7 +12,7 @@ The `GeneralProfile` might not be compatible. Try:
 
 ```powershell
 # As Administrator
-cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts
+cd C:\source\quantum\.git\presonus-quantum-linux\scripts
 .\windows_trace_alternative.ps1 -OutputFile quantum_io_trace.etl -DurationSeconds 15
 ```
 
@@ -31,7 +31,7 @@ WPA might need Windows Performance Toolkit components:
 Extract events without WPA:
 
 ```powershell
-cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts
+cd C:\source\quantum\.git\presonus-quantum-linux\scripts
 tracerpt quantum_trace.etl -o quantum_events.csv -of CSV
 # Then search the CSV for MMIO/I/O patterns
 ```
