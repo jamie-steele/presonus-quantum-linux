@@ -29,6 +29,28 @@ tasks:
       - investigating startup artifacts or playback disruption during capture transitions
       - preparing performance or low-latency release claims
 
+  - id: TASK-003
+    title: ALSA RawMIDI support for the DIN MIDI ports
+    path: docs/agents/tasks/midi-port-support.md
+    summary: Recover the Quantum 2626 MIDI transport and expose byte-correct DIN MIDI input/output without regressing the proven audio path.
+    status: backlog
+    load_when:
+      - investigating the Quantum 2626 physical MIDI input or output
+      - analyzing vendor MIDI transport, mailbox messages, FIFOs, or interrupts
+      - implementing ALSA RawMIDI support
+      - validating MIDI loopback or simultaneous MIDI and audio operation
+
+  - id: TASK-006
+    title: PipeWire discontinuity discriminator instrumentation
+    path: docs/agents/tasks/pipewire-discontinuity-instrumentation.md
+    summary: Isolate PipeWire capture draining from analysis and retain helper, data-loop, and error-transition evidence before any new continuity gate.
+    status: closed
+    load_when:
+      - preparing or reviewing a PipeWire loopback continuity discriminator
+      - distinguishing playback graph faults from capture-helper backpressure
+      - changing scripts/quantum2626_loopback_soak.py instrumentation
+      - reviewing PipeWire helper or data-loop scheduling evidence
+
 maintenance:
   - Search this index and existing task records before creating overlapping work.
   - Start a focused task as one Markdown file under docs/agents/tasks/.

@@ -30,6 +30,51 @@ playback/capture concurrency completed cleanly. YouTube playback through the
 desktop path is physically audible on the connected headphones; read
 `../notes/CURRENT_STATUS.md` for the exact evidence before another live test.
 
+The current source also tightens ALSA's per-substream CPU-latency QoS request
+to 2 microseconds after a successful PCM prepare. A temporary userspace request
+at that value eliminated audible pops during the first bounded listening
+interval. The driver implementation is now installed and loaded, and startup
+PCM probes complete cleanly. Initial ordinary playback nevertheless crackles;
+live evidence proves the QoS request is active and instead identifies the newly
+active `msbits=24` metadata as the leading regression variable pending an exact
+QoS-only A/B. The current source removes that precision constraint while
+retaining the 2-microsecond QoS update. That exact discriminator is now
+installed and loaded; PipeWire returned to 32 resolution bits and startup PCM
+probes remain clean. The first ordinary Firefox playback result was audibly
+excellent and clean with zero graph errors, correct IRQ cadence, and deep idle
+suppressed. Longer listening remains appropriate before a durable no-pop claim.
+The request follows ALSA's configured PCM lifetime and can reduce deep
+CPU idle, increasing power use while a PCM remains prepared.
+
+The current source contains a WirePlumber-compatibility duplex A/B candidate.
+It preallocates persistent playback and capture DMA buffers, keeps the joint page
+tables stable when one direction opens or closes, and aligns an independent late
+direction at the next hardware-ring wrap. It deliberately omits ALSA synchronized
+start metadata and grouped trigger completion because the installed build carrying
+those additions reproducibly left WirePlumber 0.4 with 13 sinks and no capture
+sources. The compatibility A/B is installed and loaded, but it reproduced the
+same 13-sink/0-source graph. Capture discovery also caused an IOMMU DMA-write
+fault from the Quantum PCI function to address zero at the stop/teardown
+boundary, excluding synchronized-start handling as the cause. The current
+source corrects that lifetime window by mapping the fixed maximum ALSA buffers
+once and retaining both DMA page tables across `hw_free` and rapid discovery
+cycles while programming active geometry separately. It builds cleanly and is
+now installed and loaded. The same rapid probe storm no longer triggers a
+DMAR/IOMMU fault, but WirePlumber still destroys the capture adapter and leaves
+13 sinks with no stable sources. User listening also found a new static artifact
+despite exact geometry and IRQ cadence. The full maximum-buffer data-page mapping
+is the leading regression variable; this runtime candidate is rejected. The next
+source correction now keeps the coherent page-table allocation stable while
+populating and linking only active-buffer pages, and builds cleanly offline. It
+is installed and loaded; native 44.1 kHz/128/512 playback returned without a
+DMA/IOMMU fault, and initial user listening sounds good without reproducing the
+maximum-map static artifact. Continued ordinary gaming use remained super stable
+with no audible pops. A later read-only PipeWire snapshot, taken after a longer
+settle than the activation controller allowed, found all 13 sinks and 26 sources;
+capture remains closed and native-44.1 duplex is not yet validated.
+Consult `../notes/CURRENT_STATUS.md` before any further activation or duplex
+validation.
+
 ## Build
 
 ```bash
