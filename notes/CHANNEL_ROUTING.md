@@ -1,6 +1,6 @@
 # Quantum 2626 Channel Routing
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-18
 
 This note records physical channel order recovered from the x86_64 macOS
 DriverKit extension. Labels in the tables are **static analysis** unless an
@@ -21,8 +21,10 @@ The vendor table contains 26 playback channels in this order:
 
 **Observed Linux and user-observed hardware:** channels 1 and 2 were audible
 on headphone left and right respectively during bounded 48 kHz tests. The
-other physical outputs, including rear Main, S/PDIF, and ADAT, have not yet
-been independently listened to or measured on Linux.
+left side of the Line Outputs 3-4 desktop endpoint, playback index 2 / ALSA
+channel 3, was independently identified at the patch bay with a bounded tone
+on 2026-08-18. The other physical outputs, including rear Main, S/PDIF, and
+ADAT, have not yet been independently listened to or measured on Linux.
 
 ## Capture at 44.1 or 48 kHz
 
@@ -45,6 +47,16 @@ only binding 4, while the earlier paired Mic/Instrument test ran concurrently
 with Main playback.
 Physical source identity beyond the statically recovered order still requires
 an applied signal or clock-compatible digital sender.
+
+**Observed Linux and user-connected hardware, 2026-08-18:** a bounded 660 Hz
+tone from Line Out 3 returned through the connected Digimax D8 and optical
+ADAT path on ADAT Input 1, capture index 10 / ALSA channel 11. Its spectral
+signature was 44.64 dB above the next input. The five-second raw 26-channel
+capture held native 44.1 kHz, S32_LE, 128-frame periods, and a 512-frame
+buffer; capture closed afterward and no raw audio was retained. This confirms
+the current end-to-end patch and ADAT Input 1 binding. It does not reduce the
+path to a direct Quantum analog loop: Digimax ADC and ADAT clock behavior
+remain part of any result measured through this connection.
 
 ## Rate-dependent channel counts
 
