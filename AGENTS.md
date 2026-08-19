@@ -1,8 +1,9 @@
-# Quantum 2626 Agent Router
+# PreSonus Quantum Linux Agent Router
 
-Quantum2626 is an experimental out-of-tree ALSA PCI driver for the PreSonus Quantum 2626
-Thunderbolt audio interface. This file is the small, always-loaded router; durable guidance lives
-under `docs/agents/`.
+PreSonus Quantum Linux is an experimental Linux audio support project aiming to cover the full
+PreSonus Quantum family. Its current out-of-tree ALSA PCI driver is enabled and hardware-tested
+only for the Quantum 2626 Thunderbolt interface. This file is the small, always-loaded router;
+durable guidance lives under `docs/agents/`.
 
 ## Loading Protocol
 
