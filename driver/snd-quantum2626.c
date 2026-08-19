@@ -18,6 +18,7 @@
 #include <linux/jiffies.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
+#include <linux/pm_qos.h>
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/pcm.h>
@@ -95,6 +96,7 @@ MODULE_DESCRIPTION("Experimental PreSonus Quantum 2626 ALSA PCI driver");
 #define QUANTUM_AUDIO_MIN_PERIODS	2
 #define QUANTUM_AUDIO_MAX_PERIODS	64
 #define QUANTUM_AUDIO_BYTES_PER_SAMPLE	4
+#define QUANTUM_AUDIO_CPU_LATENCY_US	2
 #define QUANTUM_AUDIO_MAX_BUFFER_BYTES \
 	(QUANTUM_AUDIO_MAX_CHANNELS * QUANTUM_AUDIO_BYTES_PER_SAMPLE * \
 	 QUANTUM_AUDIO_PERIOD_FRAMES * \
@@ -155,6 +157,7 @@ struct quantum_dma_table {
 	void *area;
 	dma_addr_t dma;
 	size_t bytes;
+	u32 addresses_per_segment;
 };
 
 struct quantum_chip {
@@ -188,14 +191,12 @@ struct quantum_chip {
 	spinlock_t audio_lock;
 	struct quantum_dma_table playback_table;
 	struct quantum_dma_table capture_table;
-	void *playback_silence_area;
-	dma_addr_t playback_silence_dma;
-	void *capture_sink_area;
-	dma_addr_t capture_sink_dma;
+	/* Fixed PCM buffers and their page tables stay valid until card release. */
 	size_t audio_buffer_bytes;
 	u32 audio_params;
 	u32 audio_prepared;
 	u32 audio_running;
+	u32 audio_pending;
 	bool audio_engine_running;
 	u32 irq_mask;
 	u64 audio_irq_count;
@@ -759,6 +760,7 @@ static void quantum_dma_table_free(struct quantum_chip *chip,
 	table->area = NULL;
 	table->dma = 0;
 	table->bytes = 0;
+	table->addresses_per_segment = 0;
 }
 
 static void quantum_audio_clear_registers(struct quantum_chip *chip)
@@ -794,33 +796,55 @@ static void quantum_audio_free_resources(struct quantum_chip *chip)
 	quantum_audio_clear_registers(chip);
 	quantum_dma_table_free(chip, &chip->capture_table);
 	quantum_dma_table_free(chip, &chip->playback_table);
-	if (chip->playback_silence_area) {
-		dma_free_coherent(&chip->pci->dev, chip->audio_buffer_bytes,
-				  chip->playback_silence_area,
-				  chip->playback_silence_dma);
-		chip->playback_silence_area = NULL;
-		chip->playback_silence_dma = 0;
-	}
-	if (chip->capture_sink_area) {
-		dma_free_coherent(&chip->pci->dev, chip->audio_buffer_bytes,
-				  chip->capture_sink_area,
-				  chip->capture_sink_dma);
-		chip->capture_sink_area = NULL;
-		chip->capture_sink_dma = 0;
-	}
 	chip->audio_buffer_bytes = 0;
 	quantum_audio_set_prepared(chip, 0);
 }
 
-static int quantum_dma_table_build(struct quantum_chip *chip,
-				   struct quantum_dma_table *table,
-				   dma_addr_t buffer_dma, size_t buffer_bytes,
-				   u32 addresses_per_segment)
+static int quantum_dma_table_allocate(struct quantum_chip *chip,
+				      struct quantum_dma_table *table,
+				      u32 addresses_per_segment)
 {
-	unsigned int pages, segments, segment, page = 0;
+	unsigned int pages, segments;
 
 	if (!addresses_per_segment || addresses_per_segment >= PAGE_SIZE / sizeof(__le64))
 		return -EPROTO;
+	if (table->area)
+		return table->addresses_per_segment == addresses_per_segment ?
+			0 : -EPROTO;
+
+	pages = DIV_ROUND_UP(QUANTUM_AUDIO_MAX_BUFFER_BYTES, PAGE_SIZE);
+	segments = DIV_ROUND_UP(pages, addresses_per_segment);
+	table->bytes = segments * PAGE_SIZE;
+	table->addresses_per_segment = addresses_per_segment;
+	table->area = dma_alloc_coherent(&chip->pci->dev, table->bytes,
+					 &table->dma, GFP_KERNEL);
+	if (!table->area) {
+		table->bytes = 0;
+		table->addresses_per_segment = 0;
+		return -ENOMEM;
+	}
+	if (!IS_ALIGNED(table->dma, PAGE_SIZE)) {
+		dev_err(&chip->pci->dev, "audio DMA table is not page aligned: %pad\n",
+			&table->dma);
+		quantum_dma_table_free(chip, table);
+		return -EINVAL;
+	}
+	memset(table->area, 0, table->bytes);
+
+	return 0;
+}
+
+static int quantum_dma_table_populate(struct quantum_chip *chip,
+				      struct quantum_dma_table *table,
+				      dma_addr_t buffer_dma,
+				      size_t buffer_bytes)
+{
+	unsigned int pages, segments, segment, page = 0;
+	u32 addresses_per_segment = table->addresses_per_segment;
+
+	if (!table->area || !addresses_per_segment || !buffer_bytes ||
+	    buffer_bytes > QUANTUM_AUDIO_MAX_BUFFER_BYTES)
+		return -EINVAL;
 	if (!IS_ALIGNED(buffer_dma, PAGE_SIZE)) {
 		dev_err(&chip->pci->dev, "audio DMA buffer is not page aligned: %pad\n",
 			&buffer_dma);
@@ -829,17 +853,8 @@ static int quantum_dma_table_build(struct quantum_chip *chip,
 
 	pages = DIV_ROUND_UP(buffer_bytes, PAGE_SIZE);
 	segments = DIV_ROUND_UP(pages, addresses_per_segment);
-	table->bytes = segments * PAGE_SIZE;
-	table->area = dma_alloc_coherent(&chip->pci->dev, table->bytes,
-					 &table->dma, GFP_KERNEL);
-	if (!table->area)
+	if (segments * PAGE_SIZE > table->bytes)
 		return -ENOMEM;
-	if (!IS_ALIGNED(table->dma, PAGE_SIZE)) {
-		dev_err(&chip->pci->dev, "audio DMA table is not page aligned: %pad\n",
-			&table->dma);
-		quantum_dma_table_free(chip, table);
-		return -EINVAL;
-	}
 
 	memset(table->area, 0, table->bytes);
 	for (segment = 0; segment < segments; segment++) {
@@ -856,6 +871,7 @@ static int quantum_dma_table_build(struct quantum_chip *chip,
 			entries[entry] = cpu_to_le64((table->dma +
 							 (segment + 1) * PAGE_SIZE) | 1ULL);
 	}
+	dma_wmb();
 
 	return 0;
 }
@@ -887,6 +903,7 @@ static int quantum_audio_stop(struct quantum_chip *chip)
 	spin_lock_irqsave(&chip->audio_lock, flags);
 	chip->audio_engine_running = false;
 	chip->audio_running = 0;
+	chip->audio_pending = 0;
 	chip->playback_substream = NULL;
 	chip->capture_substream = NULL;
 	irq_count = chip->audio_irq_count;
@@ -971,60 +988,6 @@ static int quantum_audio_program_resources(struct quantum_chip *chip)
 		 chip->audio_params, chip->audio_buffer_bytes, buffer_frames,
 		 QUANTUM_AUDIO_PERIOD_FRAMES,
 		 readl(chip->iobase + QUANTUM_REG_AUDIO_PAGE_STATUS));
-
-	return 0;
-}
-
-static void quantum_audio_snapshot_running(
-	struct quantum_chip *chip, u32 *running,
-	struct snd_pcm_substream **playback,
-	struct snd_pcm_substream **capture)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->audio_lock, flags);
-	*running = chip->audio_running;
-	*playback = chip->playback_substream;
-	*capture = chip->capture_substream;
-	spin_unlock_irqrestore(&chip->audio_lock, flags);
-}
-
-static int quantum_audio_restore_running(
-	struct quantum_chip *chip, u32 running,
-	struct snd_pcm_substream *playback,
-	struct snd_pcm_substream *capture)
-{
-	unsigned long flags;
-	u32 start_position;
-
-	if (!running)
-		return 0;
-	if ((READ_ONCE(chip->audio_prepared) & running) != running)
-		return -EIO;
-
-	start_position = readl(chip->iobase + QUANTUM_REG_AUDIO_POSITION);
-	spin_lock_irqsave(&chip->audio_lock, flags);
-	chip->playback_substream = playback;
-	chip->capture_substream = capture;
-	chip->audio_running = running;
-	chip->audio_engine_running = true;
-	chip->audio_start_position = start_position;
-	chip->audio_irq_count = 0;
-	chip->audio_last_irq_position = start_position;
-	chip->audio_last_irq_status = 0;
-	spin_unlock_irqrestore(&chip->audio_lock, flags);
-
-	dma_wmb();
-	writel(QUANTUM_IRQ_AUDIO, chip->iobase + QUANTUM_REG_IRQ_STATUS);
-	spin_lock_irqsave(&chip->audio_lock, flags);
-	chip->irq_mask |= QUANTUM_IRQ_AUDIO;
-	writel(chip->irq_mask, chip->iobase + QUANTUM_REG_IRQ_MASK);
-	spin_unlock_irqrestore(&chip->audio_lock, flags);
-	writel(QUANTUM_AUDIO_CONTROL_RUN,
-	       chip->iobase + QUANTUM_REG_AUDIO_CONTROL);
-	dev_info(&chip->pci->dev,
-		 "audio DMA resumed after duplex reconfiguration: directions=0x%x\n",
-		 running);
 
 	return 0;
 }
@@ -1175,57 +1138,48 @@ static int quantum_pcm_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int quantum_audio_build_resources(struct quantum_chip *chip, size_t bytes)
+static int quantum_audio_configure_resources(struct quantum_chip *chip,
+					     size_t bytes)
 {
+	struct snd_pcm_substream *playback =
+		chip->pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
+	struct snd_pcm_substream *capture =
+		chip->pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
 	dma_addr_t playback_dma, capture_dma;
 	u32 capture_addresses, playback_addresses;
 	int err;
 
-	quantum_audio_free_resources(chip);
-	chip->audio_buffer_bytes = bytes;
+	if (!playback || !capture || !playback->dma_buffer.area ||
+	    !capture->dma_buffer.area ||
+	    playback->dma_buffer.bytes < QUANTUM_AUDIO_MAX_BUFFER_BYTES ||
+	    capture->dma_buffer.bytes < QUANTUM_AUDIO_MAX_BUFFER_BYTES ||
+	    bytes > QUANTUM_AUDIO_MAX_BUFFER_BYTES)
+		return -ENOMEM;
 
-	if (chip->audio_params & QUANTUM_STREAM_PLAYBACK) {
-		playback_dma = chip->playback_params_substream->runtime->dma_addr;
-	} else {
-		chip->playback_silence_area =
-			dma_alloc_coherent(&chip->pci->dev, bytes,
-					   &chip->playback_silence_dma,
-					   GFP_KERNEL);
-		if (!chip->playback_silence_area) {
-			err = -ENOMEM;
-			goto fail;
-		}
-		memset(chip->playback_silence_area, 0, bytes);
-		playback_dma = chip->playback_silence_dma;
-	}
+	playback_dma = playback->dma_buffer.addr;
+	capture_dma = capture->dma_buffer.addr;
 
-	if (chip->audio_params & QUANTUM_STREAM_CAPTURE) {
-		capture_dma = chip->capture_params_substream->runtime->dma_addr;
-	} else {
-		chip->capture_sink_area =
-			dma_alloc_coherent(&chip->pci->dev, bytes,
-					   &chip->capture_sink_dma, GFP_KERNEL);
-		if (!chip->capture_sink_area) {
-			err = -ENOMEM;
-			goto fail;
-		}
-		memset(chip->capture_sink_area, 0, bytes);
-		capture_dma = chip->capture_sink_dma;
-	}
-
-	dma_wmb();
 	capture_addresses = readl(chip->iobase +
 				  QUANTUM_REG_REC_ADDRS_PER_SEGMENT);
 	playback_addresses = readl(chip->iobase +
 				   QUANTUM_REG_PLAY_ADDRS_PER_SEGMENT);
-	err = quantum_dma_table_build(chip, &chip->capture_table,
-				      capture_dma, bytes, capture_addresses);
+	err = quantum_dma_table_allocate(chip, &chip->capture_table,
+					 capture_addresses);
 	if (err)
 		goto fail;
-	err = quantum_dma_table_build(chip, &chip->playback_table,
-				      playback_dma, bytes, playback_addresses);
+	err = quantum_dma_table_allocate(chip, &chip->playback_table,
+					 playback_addresses);
 	if (err)
 		goto fail;
+	err = quantum_dma_table_populate(chip, &chip->capture_table,
+					 capture_dma, bytes);
+	if (err)
+		goto fail;
+	err = quantum_dma_table_populate(chip, &chip->playback_table,
+					 playback_dma, bytes);
+	if (err)
+		goto fail;
+	chip->audio_buffer_bytes = bytes;
 
 	return 0;
 
@@ -1241,11 +1195,11 @@ static int quantum_pcm_hw_params(struct snd_pcm_substream *substream,
 		quantum_rate_profile_for_rate(params_rate(params));
 	struct quantum_chip *chip = snd_pcm_substream_chip(substream);
 	struct snd_pcm_substream **params_substream;
-	struct snd_pcm_substream *other, *running_playback, *running_capture;
+	struct snd_pcm_substream *other;
 	size_t bytes = params_buffer_bytes(params);
-	u32 mask = quantum_stream_mask(substream), running;
+	u32 mask = quantum_stream_mask(substream);
 	bool changing_rate;
-	int err;
+	int err = 0;
 
 	if (!profile || params_channels(params) != profile->channels ||
 	    params_format(params) != SNDRV_PCM_FORMAT_S32_LE ||
@@ -1263,23 +1217,13 @@ static int quantum_pcm_hw_params(struct snd_pcm_substream *substream,
 		err = -EINVAL;
 		goto unlock;
 	}
-	quantum_audio_snapshot_running(chip, &running, &running_playback,
-				       &running_capture);
 	changing_rate = chip->audio_rate != profile->rate;
-	if (changing_rate && running) {
+	if (changing_rate && READ_ONCE(chip->audio_engine_running)) {
 		err = -EBUSY;
 		goto unlock;
 	}
-	if (running) {
-		err = quantum_audio_stop(chip);
-		if (err)
-			goto unlock;
-		if (chip->irq_requested)
-			synchronize_irq(chip->irq);
-	}
 	if (changing_rate) {
-		/* Match the vendor sequence: no live DMA resources during a switch. */
-		quantum_audio_free_resources(chip);
+		/* The engine is stopped; fixed DMA mappings remain valid. */
 		err = quantum_tci_set_sample_rate(chip, profile);
 		if (err)
 			goto unlock;
@@ -1289,23 +1233,23 @@ static int quantum_pcm_hw_params(struct snd_pcm_substream *substream,
 		&chip->playback_params_substream : &chip->capture_params_substream;
 	*params_substream = substream;
 	chip->audio_params |= mask;
-	quantum_audio_set_prepared(chip, 0);
-	err = quantum_audio_build_resources(chip, bytes);
-	if (err) {
-		chip->audio_params &= ~mask;
-		*params_substream = NULL;
-		goto unlock;
+	quantum_audio_set_prepared(chip,
+				   READ_ONCE(chip->audio_prepared) & ~mask);
+	if (!chip->capture_table.area || !chip->playback_table.area ||
+	    chip->audio_buffer_bytes != bytes) {
+		if (READ_ONCE(chip->audio_engine_running)) {
+			err = -EBUSY;
+			goto clear_params;
+		}
+		err = quantum_audio_configure_resources(chip, bytes);
+		if (err)
+			goto clear_params;
 	}
-	if (running) {
-		/* The joint engine reads playback even before that stream starts. */
-		if (mask == QUANTUM_STREAM_PLAYBACK)
-			memset(substream->runtime->dma_area, 0, bytes);
-		err = quantum_audio_program_resources(chip);
-		if (!err)
-			err = quantum_audio_restore_running(chip, running,
-							    running_playback,
-							    running_capture);
-	}
+	goto unlock;
+
+clear_params:
+	chip->audio_params &= ~mask;
+	*params_substream = NULL;
 
 unlock:
 	mutex_unlock(&chip->audio_mutex);
@@ -1316,22 +1260,14 @@ static int quantum_pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct quantum_chip *chip = snd_pcm_substream_chip(substream);
 	struct snd_pcm_substream **params_substream;
-	struct snd_pcm_substream *running_playback, *running_capture;
-	u32 mask = quantum_stream_mask(substream), running;
-	size_t remaining_bytes = 0;
+	u32 mask = quantum_stream_mask(substream);
 	int err = 0;
 
 	mutex_lock(&chip->audio_mutex);
-	quantum_audio_snapshot_running(chip, &running, &running_playback,
-				       &running_capture);
-	if (running & mask) {
+	if ((READ_ONCE(chip->audio_running) |
+	     READ_ONCE(chip->audio_pending)) & mask) {
 		err = -EBUSY;
 		goto unlock;
-	}
-	if (running) {
-		err = quantum_audio_stop(chip);
-		if (err)
-			goto unlock;
 	}
 	if (chip->irq_requested)
 		synchronize_irq(chip->irq);
@@ -1339,32 +1275,42 @@ static int quantum_pcm_hw_free(struct snd_pcm_substream *substream)
 		&chip->playback_params_substream : &chip->capture_params_substream;
 	*params_substream = NULL;
 	chip->audio_params &= ~mask;
-	quantum_audio_free_resources(chip);
-	if (chip->audio_params) {
-		struct snd_pcm_substream *remaining =
-			chip->playback_params_substream ?:
-			chip->capture_params_substream;
-
-		remaining_bytes = frames_to_bytes(remaining->runtime,
-						  remaining->runtime->buffer_size);
-		err = quantum_audio_build_resources(chip, remaining_bytes);
-		if (!err && running) {
-			err = quantum_audio_program_resources(chip);
-			if (!err)
-				err = quantum_audio_restore_running(
-					chip, running, running_playback,
-					running_capture);
-		}
-	}
+	quantum_audio_set_prepared(chip,
+				   READ_ONCE(chip->audio_prepared) & ~mask);
+	if (mask == QUANTUM_STREAM_PLAYBACK &&
+	    substream->dma_buffer.area && chip->audio_buffer_bytes)
+		memset(substream->dma_buffer.area, 0, chip->audio_buffer_bytes);
+	/*
+	 * The fixed ALSA buffers outlive hw_free.  Keep both page tables and
+	 * their MMIO addresses valid as well: the device can issue a final DMA
+	 * transaction after its stop-status bits clear.
+	 */
 
 unlock:
 	mutex_unlock(&chip->audio_mutex);
 	return err;
 }
 
+static void quantum_pcm_apply_latency_qos(struct snd_pcm_substream *substream)
+{
+	struct pm_qos_request *request = &substream->latency_pm_qos_req;
+
+	/* The generic period-duration request still permits disruptive deep idle. */
+	if (cpu_latency_qos_request_active(request))
+		cpu_latency_qos_update_request(request,
+					       QUANTUM_AUDIO_CPU_LATENCY_US);
+	else
+		cpu_latency_qos_add_request(request,
+					    QUANTUM_AUDIO_CPU_LATENCY_US);
+}
+
 static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct quantum_chip *chip = snd_pcm_substream_chip(substream);
+	struct snd_pcm_substream *playback =
+		chip->pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
+	struct snd_pcm_substream *capture =
+		chip->pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
 	u32 mask = quantum_stream_mask(substream);
 	int err;
 
@@ -1376,20 +1322,24 @@ static int quantum_pcm_prepare(struct snd_pcm_substream *substream)
 		goto unlock;
 	}
 	if (READ_ONCE(chip->audio_engine_running)) {
-		err = (READ_ONCE(chip->audio_prepared) & mask) ? 0 : -EBUSY;
+		memset(substream->runtime->dma_area, 0,
+		       chip->audio_buffer_bytes);
+		dma_wmb();
+		quantum_audio_set_prepared(chip,
+					   READ_ONCE(chip->audio_prepared) |
+					   mask);
+		err = 0;
 		goto unlock;
 	}
 	quantum_audio_set_prepared(chip, 0);
-	memset(substream->runtime->dma_area, 0, chip->audio_buffer_bytes);
-	if (chip->playback_silence_area)
-		memset(chip->playback_silence_area, 0,
-		       chip->audio_buffer_bytes);
-	if (chip->capture_sink_area)
-		memset(chip->capture_sink_area, 0, chip->audio_buffer_bytes);
+	memset(playback->dma_buffer.area, 0, chip->audio_buffer_bytes);
+	memset(capture->dma_buffer.area, 0, chip->audio_buffer_bytes);
 	err = quantum_audio_program_resources(chip);
 
 unlock:
 	mutex_unlock(&chip->audio_mutex);
+	if (!err)
+		quantum_pcm_apply_latency_qos(substream);
 	return err;
 }
 
@@ -1414,9 +1364,12 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			chip->playback_substream = substream;
 		else
 			chip->capture_substream = substream;
-		chip->audio_running |= mask;
+		if (first)
+			chip->audio_running |= mask;
+		else
+			chip->audio_pending |= mask;
 		chip->audio_engine_running = true;
-		running = chip->audio_running;
+		running = chip->audio_running | chip->audio_pending;
 		if (first) {
 			chip->audio_start_position = start_position;
 			chip->audio_irq_count = 0;
@@ -1442,11 +1395,13 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 		spin_lock_irqsave(&chip->audio_lock, flags);
 		chip->audio_running &= ~mask;
+		chip->audio_pending &= ~mask;
 		if (mask == QUANTUM_STREAM_PLAYBACK)
 			chip->playback_substream = NULL;
 		else
 			chip->capture_substream = NULL;
-		last = chip->audio_engine_running && !chip->audio_running;
+		last = chip->audio_engine_running && !chip->audio_running &&
+		       !chip->audio_pending;
 		spin_unlock_irqrestore(&chip->audio_lock, flags);
 		return last ? quantum_audio_stop(chip) : 0;
 	default:
@@ -1457,8 +1412,11 @@ static int quantum_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 static snd_pcm_uframes_t quantum_pcm_pointer(struct snd_pcm_substream *substream)
 {
 	struct quantum_chip *chip = snd_pcm_substream_chip(substream);
+	u32 mask = quantum_stream_mask(substream);
 	u32 position = readl(chip->iobase + QUANTUM_REG_AUDIO_POSITION);
 
+	if (!(READ_ONCE(chip->audio_running) & mask))
+		return 0;
 	return (position & GENMASK(19, 0)) % substream->runtime->buffer_size;
 }
 
@@ -1488,8 +1446,8 @@ static int snd_quantum_pcm_new(struct quantum_chip *chip)
 
 	return snd_pcm_set_managed_buffer_all(chip->pcm, SNDRV_DMA_TYPE_DEV,
 					      &chip->pci->dev,
-					      0,
-					      QUANTUM_AUDIO_MAX_BUFFER_BYTES);
+					      QUANTUM_AUDIO_MAX_BUFFER_BYTES,
+					      0);
 }
 
 /* ----- Resource release ----- */
@@ -1522,7 +1480,8 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 	struct snd_pcm_substream *playback = NULL;
 	struct snd_pcm_substream *capture = NULL;
 	unsigned long flags;
-	u32 position = 0, raw_status, status;
+	u32 position = 0, previous_position, promoted = 0;
+	u32 raw_status, status;
 
 	if (!chip->iobase)
 		return IRQ_NONE;
@@ -1537,13 +1496,35 @@ static irqreturn_t snd_quantum_interrupt(int irq, void *dev_id)
 	if (status & QUANTUM_IRQ_AUDIO) {
 		position = readl(chip->iobase + QUANTUM_REG_AUDIO_POSITION);
 		spin_lock_irqsave(&chip->audio_lock, flags);
+		previous_position = chip->audio_last_irq_position;
 		chip->audio_last_irq_status = raw_status;
 		chip->audio_last_irq_position = position;
 		if (chip->audio_engine_running) {
+			u32 buffer_frames = chip->audio_buffer_bytes /
+				(chip->audio_channels *
+				 QUANTUM_AUDIO_BYTES_PER_SAMPLE);
+
+			if (chip->audio_pending && buffer_frames) {
+				u32 frame =
+					(position & GENMASK(19, 0)) % buffer_frames;
+				u32 previous_frame =
+					(previous_position & GENMASK(19, 0)) %
+					buffer_frames;
+
+				if (frame < previous_frame) {
+					/* The hardware and late ALSA ring are aligned. */
+					promoted = chip->audio_pending;
+					chip->audio_running |= promoted;
+					chip->audio_pending = 0;
+				}
+			}
 			chip->audio_irq_count++;
-			if (chip->audio_running & QUANTUM_STREAM_PLAYBACK)
+			/* Its first elapsed period is the one after alignment. */
+			if ((chip->audio_running & ~promoted) &
+			    QUANTUM_STREAM_PLAYBACK)
 				playback = chip->playback_substream;
-			if (chip->audio_running & QUANTUM_STREAM_CAPTURE)
+			if ((chip->audio_running & ~promoted) &
+			    QUANTUM_STREAM_CAPTURE)
 				capture = chip->capture_substream;
 		}
 		spin_unlock_irqrestore(&chip->audio_lock, flags);
