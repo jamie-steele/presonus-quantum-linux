@@ -1,11 +1,14 @@
 # Repository Metadata Guidance
 
-Discovery metadata must describe the Linux driver that exists today, not the
-vendor hardware's maximum specification or a future driver target.
+Discovery metadata may describe the full-family goal, but must distinguish that
+roadmap from the Linux driver that exists today. Do not advertise the vendor
+hardware's maximum specification as implemented Linux support.
 
 ## Accurate Search Terms
 
 - PreSonus Quantum 2626 Linux
+- PreSonus Quantum Linux
+- PreSonus Quantum family Linux support
 - Linux ALSA Thunderbolt audio driver
 - Quantum 2626 PipeWire
 - out-of-tree ALSA PCI driver
@@ -14,6 +17,10 @@ vendor hardware's maximum specification or a future driver target.
 ## Accuracy Boundaries
 
 - State that playback and capture work on tested hardware.
+- State that full Quantum family support is a goal, while the Quantum 2626 is
+  currently the only enabled and hardware-tested model.
+- Do not imply that the Thunderbolt driver supports the USB-C Quantum ES or HD
+  models; those models require separate transport investigation.
 - Describe the currently supported Linux contract as fixed 48 kHz, 26-channel,
   S32_LE duplex audio.
 - Do not advertise 96 or 192 kHz Linux support until sample-rate switching is

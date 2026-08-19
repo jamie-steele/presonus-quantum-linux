@@ -12,7 +12,7 @@ Quick reference for continuing the Ghidra analysis session.
 
 1. **Open Ghidra:**
    ```powershell
-   cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts
+   cd C:\source\quantum\.git\presonus-quantum-linux\scripts
    .\ghidra_analyze_driver.ps1
    ```
 
