@@ -2,13 +2,13 @@
 
 ## Status
 
-Active (local validation complete; authorized hosted validation and publication next)
+Closed (validated, published and verified through the live signed APT feed)
 
 ## Objective
 
 Fix the reported Pop!_OS 22.04 APT dependency failure without replacing system
 DKMS, and prevent similar packaging failures on supported distro bases.
-Follow-up to [TASK-016](closed/native-package-distribution.md).
+Follow-up to [TASK-016](native-package-distribution.md).
 
 ## Decisions
 
@@ -44,14 +44,32 @@ Follow-up to [TASK-016](closed/native-package-distribution.md).
   upgrade, configuration preservation and removal/purge on Ubuntu 22.04
   (`5.15.0-194-generic`), Ubuntu 24.04 (`6.8.0-142-generic`) and Debian 12
   (`6.1.0-53-amd64`) and Debian 13 (`6.12.107+deb13-amd64`). The installed UCM
-  profile was parsed at each install step. Hosted Fedora/openSUSE/Arch gates
-  remain pending.
+  profile was parsed at each install step. Hosted Fedora/openSUSE native and Arch
+  source gates subsequently passed.
 - Local package-test evidence is under `/tmp/quantum-distro-compat-validation`.
 - The user explicitly authorized commit, merge, revision-2 publication, live APT
   verification and master synchronization into staging/dev after successful checks.
 
 ## Boundaries
 
-Do not overwrite original release assets or describe this fix as live until
-publication and a fresh signed-feed consumer check have succeeded. Preserve
-the user-reported unrelated HashiCorp key error as a separate repository issue.
+The user-reported unrelated HashiCorp key error remains a separate repository
+issue. Base-container checks do not establish Pop/Mint boot behavior, Secure Boot,
+PulseAudio migration, Thunderbolt enumeration or physical audio acceptance.
+
+## Hosted Closure
+
+- PR #26 merged as `8868e1e0f4f2f72fd23a3d3a83c64336128a3981` after source run
+  `36347279539` and native run `36347279281` passed on commit `8001477`.
+- The initial expanded test found that Debian 13 does not ship `gpgv` by default.
+  The test dependency was made explicit; real Debian 13 signature, dependency,
+  expiry and tamper checks then passed locally and on GitHub.
+- Native publication run `36347531804` passed six lifecycle and four APT jobs,
+  then attached revision-2 DEB/RPM/checksum/manifest/evidence assets to the existing
+  official RFC release. Original source and revision-1 assets were preserved.
+- Signed Pages deployment `36347753129` succeeded. A fresh Ubuntu 22.04 container
+  pinned the production public key, fetched the live HTTPS index, selected
+  `20260820.rfc1.s1148921-2`, resolved stock dependencies, downloaded the DEB and
+  parsed its extracted profile. No module was installed or loaded on the host.
+- Downloaded DEB SHA-256:
+  `34bdded811d7e5b0efe2ea366b7c60ca0f1a2b5dbadaedf976bcc6f62c6239af`.
+- Release notes now explain revision 2, APT setup, tested bases and limitations.

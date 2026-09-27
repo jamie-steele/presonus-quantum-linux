@@ -36,11 +36,14 @@ Pop!_OS 22.04. The DEB accepts the stock Jammy DKMS 2.8.7 and retains support fo
 DKMS 3. Its desktop profile uses UCM Syntax 4 without newer macros, compatible
 with Jammy's ALSA parser while preserving the same 13 stereo outputs and 26 mono
 inputs. Do not force dependencies or replace your distro's DKMS to install an
-older Quantum package. Revision 2 must be published before APT can offer this fix.
+older Quantum package. Revision 2 is published and was verified through the live
+signed APT feed from a fresh Jammy container on 2026-09-27.
 
-Desktop integration targets **PipeWire with WirePlumber 0.4 or 0.5**. Installing
-the package does not switch a PulseAudio desktop to PipeWire or restart a user's
-session. On an older Mint/Ubuntu desktop, inspect `pactl info` and follow the
+Desktop integration targets **PipeWire with WirePlumber 0.4 or 0.5**. Our package
+scripts do not restart or reconfigure a user's audio session, but distro package
+dependencies/recommendations can propose audio-server changes. The APT commands
+below disable optional recommendations and refuse removals; review the proposed
+transaction before accepting. On an older Mint/Ubuntu desktop, inspect `pactl info` and follow the
 distro's supported audio-session setup before expecting the WirePlumber policy
 to apply. Direct ALSA support and desktop endpoint discovery are separate checks.
 
@@ -64,7 +67,7 @@ Install headers for the kernel you will boot before installing the package:
 ```bash
 # Ubuntu / Debian: then use the exact downloaded filename in place of <version>.
 sudo apt install linux-headers-$(uname -r)
-sudo apt install ./quantum-dkms_<version>_amd64.deb
+sudo apt install --no-install-recommends --no-remove ./quantum-dkms_<version>_amd64.deb
 
 # Fedora 43:
 sudo dnf install kernel-devel-$(uname -r)
@@ -140,7 +143,7 @@ sudo install -d -m 0755 /etc/apt/keyrings
 sudo install -m 0644 quantum-archive-keyring.gpg /etc/apt/keyrings/
 sudo install -m 0644 quantum.sources /etc/apt/sources.list.d/quantum.sources
 sudo apt update
-sudo apt install linux-headers-$(uname -r) quantum-dkms
+sudo apt install --no-install-recommends --no-remove linux-headers-$(uname -r) quantum-dkms
 ```
 
 The feed uses a dedicated `Signed-By` key and an opt-in `experimental` suite.
@@ -304,6 +307,17 @@ build reproducible. GitHub's automatic repository source archives are the packag
 repository; download the attached `quantum-*.tar.gz` for the complete driver bundle.
 
 ## What the checks establish
+
+[TASK-017](agents/tasks/closed/distribution-compatibility.md) records the expanded
+revision-2 compatibility checks. Native publishing run
+[36347531804](https://github.com/jamie-steele/presonus-quantum-linux/actions/runs/36347531804)
+passed all six lifecycle and four signed-APT jobs; deployment
+[36347753129](https://github.com/jamie-steele/presonus-quantum-linux/actions/runs/36347753129)
+published the refreshed feed. A fresh Jammy client verified the production key,
+selected revision 2, resolved dependencies with stock DKMS 2.8.7, downloaded the
+authenticated DEB and parsed its extracted UCM profile without opening hardware.
+The DEB SHA-256 was
+`34bdded811d7e5b0efe2ea366b7c60ca0f1a2b5dbadaedf976bcc6f62c6239af`.
 
 [TASK-016](agents/tasks/closed/native-package-distribution.md) records local native
 install/reinstall/upgrade/removal checks for Ubuntu, Debian, Fedora, and openSUSE,
