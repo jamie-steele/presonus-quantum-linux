@@ -2,7 +2,7 @@
 
 ## Status
 
-Closed (local implementation and verification; hosted activation not performed)
+Closed (local verification and subsequent authorized hosted activation completed)
 
 ## Objective
 
@@ -60,14 +60,33 @@ revision upgrade `-1` to `-2`:
 
 ## Remaining Work
 
-- Maintainer: merge/push through the normal review process, run native packaging
-  for the first release, and provision/announce the APT key plus dedicated Pages
-  hosting using `docs/RELEASES.md`. No release assets, settings, or secrets changed.
+- Maintainer: renew the dedicated signing key before 2027-09-27 and retain its
+  private backup/revocation material securely. Rotate client keyrings deliberately.
 - VM boot, Secure Boot, and physical audio remain separate validation boundaries.
 
 ## Closure Summary
 
 Local native packaging, signed-feed tooling, release integration, documentation,
-and lifecycle verification completed. No new active task is needed merely for
-the documented maintainer activation steps. Production publication remains
-explicitly unperformed.
+and lifecycle verification completed. The later explicit user request authorized
+commit, push, merge, and production signing/Pages activation.
+
+## Hosted Activation, 2026-09-27
+
+- PR #24 merged as `391add5686378153bb816ad3bd0a9720b90a3352` after passing all five
+  source-distro checks. Native run `36344718365` then passed all four lifecycle
+  jobs plus the signed-feed test and attached revision-1 packages to the existing
+  `rfc-20260820.rfc1.s1148921` release without replacing its source assets.
+- A dedicated RSA-4096 signing key was provisioned separately from the tests;
+  public fingerprint `5F839BAB8E48F6572044A442D98AC6B03628D7BE`, expiry 2027-09-27.
+  Only its public export is in Git. The private key is backed up in a user-owned
+  mode-0700 local GPG directory and stored as an environment-scoped Actions secret.
+- `apt-signing` and `github-pages` environments permit only `master`. Pages uses
+  Actions deployment with HTTPS; `APT_REPOSITORY_ENABLED=true` activates successful
+  release-triggered and daily refreshes.
+- Run `36344954793` successfully signed/deployed
+  `https://jamie-steele.github.io/presonus-quantum-linux/`.
+- A fresh Ubuntu container pinned the public fingerprint, ran real HTTPS
+  `apt update`, simulated dependency resolution, and downloaded the authenticated
+  revision-1 DEB. Its SHA-256 was
+  `1c3c56cb998226f5f41e08e7da9dff016474b37a4d51a448348897472fbc97cc`.
+  No driver was installed or loaded in that live-feed check or on the host.
