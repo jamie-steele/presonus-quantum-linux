@@ -1,0 +1,8 @@
+# Pinned external source for the upstream snd-quantum backend.
+UPSTREAM_REVISION=20260820-rfc-v1
+UPSTREAM_SERIES_ID=1148921
+UPSTREAM_LORE_URL=https://lore.kernel.org/all/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/
+UPSTREAM_PATCH_URL=https://patchwork.kernel.org/project/alsa-devel/patch/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/raw/
+UPSTREAM_PATCH_SHA256=52c6b88dee208f24c4ba6c7b98c5cae773d52428edd5de2be69909fef8d0172a
+UPSTREAM_DECODED_PATCH_SHA256=859821e026da60f033ad240cfaba1c5a6b26b201d1392f5225eea53295b8ee49
+UPSTREAM_SOURCE_TREE_SHA256=54e58b84a3a799b02a994032d682d5e5e8232e300772acb8ecb34bd420407fa6
