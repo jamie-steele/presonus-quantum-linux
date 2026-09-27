@@ -86,10 +86,11 @@ entries:
   - id: rfc-releases
     title: Official RFC releases and distribution
     path: docs/RELEASES.md
-    summary: Official mailing-list RFC discovery, source DKMS bundles, distro checks, and publication limits.
+    summary: Official RFC discovery, source bundles, native DEB/RPM lifecycle, signed APT setup, and publication limits.
     load_when:
       - changing release workflows, DKMS packaging, or distro installation
       - updating official RFC monitoring or release provenance
+      - changing native packages, APT signing, or package upgrade behavior
     related:
       - driver-development
       - desktop-audio

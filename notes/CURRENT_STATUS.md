@@ -25,6 +25,10 @@
   [TASK-015](../docs/agents/tasks/closed/rfc-release-integration.md) records verification. Scheduled
   publication requires the workflow on the default branch. No new hardware acceptance follows
   from source builds or packaging tests; the earlier DMA/discovery failures remain relevant.
+- Native DEB/RPM package lifecycle and signed APT metadata tooling are locally verified;
+  [TASK-016](../docs/agents/tasks/closed/native-package-distribution.md) records the evidence.
+  Native release attachment and production APT signing/Pages activation remain separate
+  maintainer steps. No new boot, Secure Boot, or physical audio acceptance is implied.
 
 ## Historical Summary Through 2026-08-21
 
