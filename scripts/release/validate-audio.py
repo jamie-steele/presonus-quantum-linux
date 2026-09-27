@@ -19,8 +19,11 @@ def main():
         environment = dict(os.environ, ALSA_CONFIG_UCM2=str(root / "ucm2"))
         result = subprocess.run(
             ["alsaucm", "-c", "P2626", "dump", "json"],
-            env=environment, capture_output=True, text=True, check=True,
+            env=environment, capture_output=True, text=True,
         )
+        if result.returncode:
+            sys.stderr.write(result.stderr)
+            result.check_returncode()
         profile = json.loads(result.stdout)["Verbs"]["HiFi"]
         playback = []
         capture = []
