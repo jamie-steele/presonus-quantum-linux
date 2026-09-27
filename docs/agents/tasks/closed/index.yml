@@ -3,6 +3,16 @@ area: closed-tasks
 description: Completed and superseded Quantum2626 task records retained as historical evidence.
 
 tasks:
+  - id: TASK-017
+    title: Distribution compatibility regression coverage
+    path: docs/agents/tasks/closed/distribution-compatibility.md
+    summary: Published revision 2 with Jammy DKMS and ALSA compatibility, expanded release gates and verified live signed-feed consumption.
+    status: closed
+    resolution: completed
+    load_when:
+      - fixing native dependency or desktop-profile compatibility
+      - extending distro release gates or reviewing revision-2 evidence
+
   - id: TASK-016
     title: Native packages and signed APT distribution
     path: docs/agents/tasks/closed/native-package-distribution.md

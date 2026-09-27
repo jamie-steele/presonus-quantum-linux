@@ -1,6 +1,7 @@
 name: Quantum native packages
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       tag:
@@ -17,12 +18,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: quantum-native-${{ inputs.tag }}
+  group: quantum-native-${{ github.event_name == 'pull_request' && github.ref || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   build:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     outputs:
       revision: ${{ steps.build.outputs.revision }}
@@ -38,13 +39,20 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          [[ "$TAG" =~ ^rfc-[0-9]{8}\.rfc[0-9]+\.s[0-9]+$ ]]
           sudo apt-get update
           sudo apt-get install -y rpm file
           python3 -m unittest discover -s tests -v
-          mkdir bundle extracted
-          gh release view "$TAG" --json isDraft --jq .isDraft | grep -qx false
-          gh release download "$TAG" --pattern "quantum-${TAG#rfc-}.tar.gz" --pattern SHA256SUMS --dir bundle
+          mkdir extracted
+          if [[ "${{ github.event_name }}" == pull_request ]]; then
+            series=$(python3 scripts/release/upstream_release.py pinned-series)
+            python3 scripts/release/upstream_release.py prepare --series "$series" --output bundle
+            TAG=$(python3 -c 'import json; print(json.load(open("bundle/manifest.json"))["tag"])')
+          else
+            [[ "$TAG" =~ ^rfc-[0-9]{8}\.rfc[0-9]+\.s[0-9]+$ ]]
+            mkdir bundle
+            gh release view "$TAG" --json isDraft --jq .isDraft | grep -qx false
+            gh release download "$TAG" --pattern "quantum-${TAG#rfc-}.tar.gz" --pattern SHA256SUMS --dir bundle
+          fi
           (cd bundle && sha256sum -c SHA256SUMS)
           tar -xzf "bundle/quantum-${TAG#rfc-}.tar.gz" -C extracted
           revision=$(cat packaging/native/revision)
@@ -67,13 +75,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - family: ubuntu
+          - id: ubuntu-22.04
+            family: ubuntu
+            image: ubuntu:22.04
+          - id: ubuntu-24.04
+            family: ubuntu
             image: ubuntu:24.04
-          - family: debian
+          - id: debian-12
+            family: debian
+            image: debian:12
+          - id: debian-13
+            family: debian
             image: debian:13
-          - family: fedora
+          - id: fedora
+            family: fedora
             image: fedora:43
-          - family: opensuse
+          - id: opensuse
+            family: opensuse
             image: opensuse/tumbleweed:latest
     timeout-minutes: 30
     steps:
@@ -88,22 +106,25 @@ jobs:
         env:
           FAMILY: ${{ matrix.family }}
           IMAGE: ${{ matrix.image }}
+          TEST_ID: ${{ matrix.id }}
         run: |
           mkdir evidence
           docker pull "$IMAGE"
-          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' > "evidence/$FAMILY-image.json"
+          mkdir -p "evidence/$TEST_ID"
+          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' > "evidence/$TEST_ID/image.json"
           docker run --rm --cap-drop=ALL --cap-add=CHOWN --cap-add=DAC_OVERRIDE --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID \
             -v "$PWD:/workspace:ro" -v "$PWD/evidence:/evidence" \
             "$IMAGE" bash /workspace/scripts/release/test-distro.sh "$FAMILY" \
-            /workspace/native-input/bundle /evidence /workspace/native-input/native /workspace/native-input/upgrade
+            /workspace/native-input/bundle "/evidence/$TEST_ID" /workspace/native-input/native /workspace/native-input/upgrade
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: native-evidence-${{ matrix.family }}
+          name: native-evidence-${{ matrix.id }}
           path: evidence/
 
   publish:
     needs: [build, test, apt-test]
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -148,6 +169,18 @@ jobs:
   apt-test:
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: ubuntu-22.04
+            image: ubuntu:22.04
+          - id: ubuntu-24.04
+            image: ubuntu:24.04
+          - id: debian-12
+            image: debian:12
+          - id: debian-13
+            image: debian:13
     steps:
       - uses: actions/checkout@v4
         with:
@@ -157,14 +190,17 @@ jobs:
           name: native-input
           path: native-input
       - name: Verify signed APT consumption and tamper rejection
+        env:
+          IMAGE: ${{ matrix.image }}
+          TEST_ID: ${{ matrix.id }}
         run: |
           mkdir evidence
           set -o pipefail
-          docker run --rm -v "$PWD:/workspace:ro" ubuntu:24.04 \
+          docker run --rm -v "$PWD:/workspace:ro" "$IMAGE" \
             bash /workspace/scripts/release/test-apt.sh /workspace/native-input/native \
-            /workspace/native-input/upgrade 2>&1 | tee evidence/apt.log
+            /workspace/native-input/upgrade 2>&1 | tee "evidence/apt-$TEST_ID.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: native-evidence-apt
+          name: native-evidence-apt-${{ matrix.id }}
           path: evidence/
