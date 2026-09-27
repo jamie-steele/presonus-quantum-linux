@@ -62,8 +62,8 @@ See [installation, distro dependencies, and release operation](docs/RELEASES.md)
 Native packaging adds an Ubuntu/Debian `quantum-dkms` DEB and Fedora/openSUSE RPMs
 after install, upgrade, and removal checks. Use your package manager to install the
 downloaded file; matching kernel headers are required. An opt-in signed APT feed
-is also prepared for ongoing updates, but requires maintainer signing-key and
-Pages setup before use. See the guide for activation status and migration from
+is configured for ongoing updates. See the guide for the production URL, signing-key
+verification, deployment status, and migration from
 the tar installer. Arch retains the source/DKMS installation path.
 
 ## Build from this repository
