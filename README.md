@@ -10,6 +10,89 @@ recovery fallback.
 mean the driver has been merged into mainline Linux. This independent project
 is not affiliated with PreSonus or Fender.
 
+**[Install with APT](#install-with-apt) | [Download DEB/RPM packages](#package-downloads) | [All releases](https://github.com/jamie-steele/presonus-quantum-linux/releases)**
+
+## Install with APT
+
+**Recommended for Ubuntu, Debian, Pop!_OS, and Linux Mint on x86_64.** Install
+`quantum-dkms` through our signed repository; no Git clone or manual driver build
+is needed. DKMS builds the module for your kernel and handles future kernel
+updates when matching headers are installed. Only the **Quantum 2626 Thunderbolt**
+interface is currently enabled; the driver remains experimental.
+
+Ubuntu 22.04/24.04 and Debian 12/13 are tested package bases. See the
+[compatibility table](docs/RELEASES.md#distribution-compatibility) for Mint/Pop,
+desktop audio, and custom-kernel limits. **Already installed an older driver?**
+Back up custom audio settings and read the
+[migration notes](docs/RELEASES.md#migrating-from-the-tar-installer) first.
+
+### 1. Add the signed repository
+
+With `curl` and `gpg` installed, download the repository configuration and public key:
+
+```bash
+APT_URL=https://jamie-steele.github.io/presonus-quantum-linux
+curl -fsSLo quantum-archive-keyring.gpg "$APT_URL/quantum-archive-keyring.gpg"
+curl -fsSLo quantum.sources "$APT_URL/quantum.sources"
+gpg --show-keys --with-fingerprint quantum-archive-keyring.gpg
+cat quantum.sources
+```
+
+**Stop if the key fingerprint does not match:**
+
+```text
+5F83 9BAB 8E48 F657 2044 A442 D98A C6B0 3628 D7BE
+```
+
+The [public key](packaging/native/apt-signing-key.asc) expires on **2027-09-27**.
+Check that `quantum.sources` points to the APT URL above and uses
+`Signed-By: /etc/apt/keyrings/quantum-archive-keyring.gpg`, then install both files:
+
+```bash
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo install -m 0644 quantum-archive-keyring.gpg /etc/apt/keyrings/
+sudo install -m 0644 quantum.sources /etc/apt/sources.list.d/quantum.sources
+```
+
+### 2. Install the driver
+
+```bash
+sudo apt update
+sudo apt install --no-install-recommends --no-remove linux-headers-$(uname -r) quantum-dkms
+```
+
+Review the proposed package changes before accepting. Reboot when convenient,
+then check:
+
+```bash
+lspci -nnk -d 1c67:0104
+```
+
+The driver-in-use line should report **`snd-quantum`**. Secure Boot may require
+your distro's DKMS key enrollment. Installation does not restart audio services;
+test playback and inputs after reboot. Future published versions arrive through
+normal `sudo apt update` / `sudo apt upgrade`.
+
+## Package downloads
+
+Prefer a standalone package? These are the **`20260820.rfc1.s1148921-2`** release
+assets. APT above automatically selects newer published versions as they arrive.
+
+| Distribution | Download |
+| --- | --- |
+| Ubuntu / Debian / compatible derivatives | [quantum-dkms AMD64 DEB][quantum-deb] |
+| Fedora 43 | [quantum-dkms x86_64 RPM][quantum-fedora] |
+| openSUSE Tumbleweed | [quantum-dkms x86_64 RPM][quantum-opensuse] |
+
+Verify the downloaded package against [revision-2 checksums][quantum-checksums],
+then follow the [native package installation commands](docs/RELEASES.md#native-packages).
+Installing a downloaded DEB alone does not subscribe to APT updates. Arch users
+can follow the [source/DKMS installation guide](docs/RELEASES.md#install-a-source-release).
+
+Downloads are attached to [GitHub Releases](https://github.com/jamie-steele/presonus-quantum-linux/releases),
+not the sidebar's **Packages** registry. [GitHub Packages' supported formats](https://docs.github.com/en/packages/learn-github-packages/introduction-to-github-packages#support-for-package-registries)
+do not include APT/DEB or RPM; our signed APT repository is hosted on GitHub Pages.
+
 ## Driver and collaboration
 
 - Nicholas Johnson authored the [original RFC patch](https://lore.kernel.org/all/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/)
@@ -46,7 +129,7 @@ further testing. See [current evidence](notes/CURRENT_STATUS.md).
 
 ## Releases
 
-The [release page](https://github.com/jamie-steele/presonus-quantum2626-linux/releases)
+The [release page](https://github.com/jamie-steele/presonus-quantum-linux/releases)
 is the distribution point for experimental RFC snapshots. The release workflow
 checks the ALSA Patchwork feed every six hours and publishes each complete new
 Nicholas Johnson Quantum RFC only after the distro build matrix passes.
@@ -58,13 +141,10 @@ Debian, Ubuntu, Fedora, openSUSE Tumbleweed, and Arch are the x86_64 CI targets;
 derivatives and other kernels require their own validation. There is no universal
 precompiled `.ko`: DKMS builds for the installed kernel and rebuilds on upgrades.
 
-See [installation, distro dependencies, and release operation](docs/RELEASES.md).
-Native packaging adds an Ubuntu/Debian `quantum-dkms` DEB and Fedora/openSUSE RPMs
-after install, upgrade, and removal checks. Use your package manager to install the
-downloaded file; matching kernel headers are required. An opt-in signed APT feed
-is configured for ongoing updates. See the guide for the production URL, signing-key
-verification, deployment status, and migration from
-the tar installer. Arch retains the source/DKMS installation path.
+Start with [APT installation](#install-with-apt) or the [DEB/RPM downloads](#package-downloads)
+above. [The full release guide](docs/RELEASES.md) covers distro dependencies,
+migration, package removal, signing, and release operation. Source builds below
+are for development and research; they are not required for package users.
 
 ## Build from this repository
 
@@ -114,3 +194,8 @@ does not grant new hardware acceptance or authorize register sweeps.
 Repository-authored material retains its existing license. RFC release bundles
 preserve Nicholas Johnson's authorship, source SPDX notices, and GPL-2.0 text;
 the root MIT license does not relicense the upstream driver.
+
+[quantum-deb]: https://github.com/jamie-steele/presonus-quantum-linux/releases/download/rfc-20260820.rfc1.s1148921/quantum-dkms_20260820.rfc1.s1148921-2_amd64.deb
+[quantum-fedora]: https://github.com/jamie-steele/presonus-quantum-linux/releases/download/rfc-20260820.rfc1.s1148921/quantum-dkms-20260820.rfc1.s1148921-2.fc43.x86_64.rpm
+[quantum-opensuse]: https://github.com/jamie-steele/presonus-quantum-linux/releases/download/rfc-20260820.rfc1.s1148921/quantum-dkms-20260820.rfc1.s1148921-2.suse.x86_64.rpm
+[quantum-checksums]: https://github.com/jamie-steele/presonus-quantum-linux/releases/download/rfc-20260820.rfc1.s1148921/native-2-SHA256SUMS
