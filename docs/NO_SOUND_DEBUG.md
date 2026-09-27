@@ -1,52 +1,28 @@
-# No sound – things to check
+# No sound diagnostics
 
-After running `aplay -D plughw:4,0 ...` with wireplumber stopped, if the stream runs but you hear nothing:
+Start with [the current testing guide](LINUX_TESTING.md) and
+[current evidence](../notes/CURRENT_STATUS.md). The default driver is
+`snd-quantum`; old `snd-quantum2626` register parameters do not apply to it.
 
-## 1. Confirm what the driver is doing
+1. Inspect `lspci -nnk -d 1c67:0104` and `/proc/asound/cards`. No PCI function
+   suggests a Thunderbolt authorization/connection issue. No ALSA card despite a
+   bound function needs the corresponding kernel probe logs.
+2. Check the kernel matches the installed module and headers. For releases, use
+   `dkms status` and `modinfo snd-quantum`; inspect module-signing failures under
+   Secure Boot. A file on disk does not prove that version is loaded.
+3. Check `wpctl status` and the selected profile/default sink. The 48 kHz UCM
+   profile should expose 13 stereo outputs and 26 mono inputs. One generic
+   multichannel pair suggests UCM selection/configuration trouble.
+4. Confirm the installed selector matches ALSA driver name `snd-quantum` and that
+   the WirePlumber file format matches 0.4 (Lua) or 0.5 (SPA-JSON). The correct UCM
+   profile can be parsed even when the live desktop graph has failed.
+5. Inspect bounded kernel and user-service logs for DMA/IOMMU errors, allocation
+   timeouts, or adapter activation failures. Stop playback/recovery experiments
+   on these faults and retain sanitized evidence before changing state.
 
-Reload with the updated driver (it now logs prepare/trigger to dmesg), then:
+Do not clear kernel logs or use arbitrary MMIO writes to diagnose ordinary audio
+configuration. A service restart or driver reload is a separate live operation
+that can interrupt audio and trigger known discovery faults.
 
-```bash
-sudo dmesg -C
-systemctl --user stop wireplumber pipewire-pulse
-aplay -D plughw:4,0 -r 48000 -f S16_LE -c 2 /usr/share/sounds/alsa/Front_Center.wav
-sudo dmesg | grep -E "quantum|prepare|trigger|CONTROL|dma_addr"
-```
-
-You should see:
-
-- `prepare playback: dma_addr=0x... buffer_size=...` – DMA address and size we program
-- `prepare: CONTROL 0x100 = 0x8 (rate=48000 format=16)`
-- `trigger START playback: CONTROL 0x100 was 0x... now 0x8`
-- `trigger STOP playback: CONTROL 0x100 was 0x... now 0x0`
-
-If those appear, the driver path is running; the problem is likely register meaning or missing setup.
-
-## 2. Likely causes
-
-- **Wrong buffer register** – Ghidra gave 0x10300/0x10304; the real DMA buffer registers might be elsewhere. Search the Windows driver for other MMIO writes with a buffer-like address.
-- **Missing buffer size / period** – The device may need buffer length or period size in another register; we don’t program that yet.
-- **Missing sample rate / format** – The device may need rate (e.g. 48000) or format (16-bit) in a register; we don’t program that yet.
-- **Wrong control value** – 0x8 might not be “start playback”. Try other values (e.g. 0x1, 0x9) in Ghidra or by changing the driver and testing.
-- **Physical output** – The Quantum has many outputs; make sure the cable/monitor is on the output the hardware uses for “main” or “playback 1/2”. Check the unit’s mixer or manual.
-
-## 3. Dump MMIO during playback
-
-Load with `dump_on_trigger=1` and capture the first 64 bytes at prepare and trigger:
-
-```bash
-sudo modprobe snd-quantum2626 dump_on_trigger=1
-# stop wireplumber, run aplay, then:
-sudo dmesg | grep -E "MMIO|prepare|trigger" | tail -80 > notes/MMIO_during_playback.txt
-```
-
-Compare with `notes/MMIO_BASELINE.md` to see which registers change when we start/stop.
-
-## 4. Optional register params (test without recompile)
-
-When you find sample rate, buffer size, or format register offsets (Ghidra or Windows capture), program them via module params: `reg_srate_offset` / `reg_srate_value`, `reg_bufsize_offset`, `reg_fmt_offset` / `reg_fmt_value` (default -1 = disabled, offsets in hex). Example: `sudo modprobe snd-quantum2626 reg_srate_offset=0x108 reg_srate_value=48000`. See driver source and notes/GHIDRA_FINDINGS_SUMMARY.md.
-
-## 5. Next RE steps
-
-- In Ghidra: find where the Windows driver **writes** buffer address, buffer size, sample rate, and stream start/stop. Confirm offsets and values.
-- Update `notes/REGISTER_GUESSES.md` and the driver’s `QUANTUM_REG_*` defines accordingly.
+[Old register-probing notes](historical/INHOUSE_NO_SOUND_DEBUG.md) remain available
+as historical research, not current operating instructions.

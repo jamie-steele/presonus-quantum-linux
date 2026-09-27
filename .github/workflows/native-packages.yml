@@ -1,0 +1,170 @@
+name: Quantum native packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published RFC tag to package (also supports the first tar-only release)'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quantum-native-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    outputs:
+      revision: ${{ steps.build.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build native packages from the published source
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^rfc-[0-9]{8}\.rfc[0-9]+\.s[0-9]+$ ]]
+          sudo apt-get update
+          sudo apt-get install -y rpm file
+          python3 -m unittest discover -s tests -v
+          mkdir bundle extracted
+          gh release view "$TAG" --json isDraft --jq .isDraft | grep -qx false
+          gh release download "$TAG" --pattern "quantum-${TAG#rfc-}.tar.gz" --pattern SHA256SUMS --dir bundle
+          (cd bundle && sha256sum -c SHA256SUMS)
+          tar -xzf "bundle/quantum-${TAG#rfc-}.tar.gz" -C extracted
+          revision=$(cat packaging/native/revision)
+          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" native
+          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" upgrade --revision "$((revision + 1))"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-input
+          path: |
+            bundle/
+            native/
+            upgrade/
+          if-no-files-found: error
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - family: ubuntu
+            image: ubuntu:24.04
+          - family: debian
+            image: debian:13
+          - family: fedora
+            image: fedora:43
+          - family: opensuse
+            image: opensuse/tumbleweed:latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-input
+          path: native-input
+      - name: Test installation, upgrade and removal without hardware
+        env:
+          FAMILY: ${{ matrix.family }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          mkdir evidence
+          docker pull "$IMAGE"
+          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' > "evidence/$FAMILY-image.json"
+          docker run --rm --cap-drop=ALL --cap-add=CHOWN --cap-add=DAC_OVERRIDE --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID \
+            -v "$PWD:/workspace:ro" -v "$PWD/evidence:/evidence" \
+            "$IMAGE" bash /workspace/scripts/release/test-distro.sh "$FAMILY" \
+            /workspace/native-input/bundle /evidence /workspace/native-input/native /workspace/native-input/upgrade
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-evidence-${{ matrix.family }}
+          path: evidence/
+
+  publish:
+    needs: [build, test, apt-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-input
+          path: native-input
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-evidence-*
+          path: evidence
+          merge-multiple: true
+      - name: Attach tested packages without replacing existing release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          REVISION: ${{ needs.build.outputs.revision }}
+        run: |
+          set -euo pipefail
+          cd native-input/native
+          sha256sum -c "native-$REVISION-SHA256SUMS"
+          # Retrying a partial upload may only reuse byte-identical package assets.
+          for asset in ./*; do
+            name=${asset#./}
+            mkdir -p /tmp/existing-native
+            if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              gh release download "$TAG" --pattern "$name" --dir /tmp/existing-native
+              cmp "$asset" "/tmp/existing-native/$name"
+            else
+              gh release upload "$TAG" "$asset"
+            fi
+          done
+          cd ../..
+          evidence="native-$REVISION-build-evidence.tar.gz"
+          if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$evidence"; then
+            tar -czf "$evidence" evidence
+            gh release upload "$TAG" "$evidence"
+          fi
+
+  apt-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-input
+          path: native-input
+      - name: Verify signed APT consumption and tamper rejection
+        run: |
+          mkdir evidence
+          set -o pipefail
+          docker run --rm -v "$PWD:/workspace:ro" ubuntu:24.04 \
+            bash /workspace/scripts/release/test-apt.sh /workspace/native-input/native \
+            /workspace/native-input/upgrade 2>&1 | tee evidence/apt.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-evidence-apt
+          path: evidence/

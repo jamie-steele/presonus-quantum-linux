@@ -1,0 +1,116 @@
+schema_version: 1
+area: closed-tasks
+description: Completed and superseded Quantum2626 task records retained as historical evidence.
+
+tasks:
+  - id: TASK-016
+    title: Native packages and signed APT distribution
+    path: docs/agents/tasks/closed/native-package-distribution.md
+    summary: Verified DEB/RPM lifecycle, published native assets, and activated a signed APT feed with a pinned-key HTTPS client check.
+    status: closed
+    resolution: completed
+    load_when:
+      - changing native package lifecycle, package upgrades, or signed APT publication
+
+  - id: TASK-001
+    title: TCI mailbox recovery from macOS traces
+    path: docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md
+    summary: Replace speculative Windows-register guessing with an evidence-backed TCI mailbox and Linux-native audio path derived from macOS behavior.
+    status: closed
+    load_when:
+      - investigating device initialization, command transport, clocking, DMA, or interrupts
+      - analyzing macOS DEXT behavior or m1n1 MMIO traces
+      - replacing the current experimental register-write path
+      - planning ALSA, PipeWire, JACK, latency, multichannel, or hot-removal validation
+
+  - id: TASK-002
+    title: Release performance hardening
+    path: docs/agents/tasks/closed/release-performance-hardening.md
+    summary: Completed bounded in-house scheduling and performance work; retained settings and follow-ups are historical, not an upstream backlog.
+    status: closed
+    resolution: completed
+    load_when:
+      - reviewing historical in-house performance measurements or accepted scheduler settings
+      - comparing a reproduced upstream issue with earlier in-house evidence
+
+  - id: TASK-003
+    title: ALSA RawMIDI support for the DIN MIDI ports
+    path: docs/agents/tasks/closed/midi-port-support.md
+    summary: Superseded in-house MIDI implementation plan; the default upstream driver already provides ALSA RawMIDI input/output.
+    status: closed
+    resolution: superseded
+    load_when:
+      - looking up why the in-house MIDI backlog was retired
+      - reviewing the original MIDI implementation proposal or public issue reference
+
+  - id: TASK-006
+    title: PipeWire discontinuity discriminator instrumentation
+    path: docs/agents/tasks/closed/pipewire-discontinuity-instrumentation.md
+    summary: Isolate PipeWire capture draining from analysis and retain helper, data-loop, and error-transition evidence before any new continuity gate.
+    status: closed
+    load_when:
+      - preparing or reviewing a PipeWire loopback continuity discriminator
+      - distinguishing playback graph faults from capture-helper backpressure
+      - changing scripts/quantum2626_loopback_soak.py instrumentation
+      - reviewing PipeWire helper or data-loop scheduling evidence
+
+  - id: TASK-007
+    title: Native-48-kHz PipeWire discriminator gate
+    path: docs/agents/tasks/closed/pipewire-48k-discriminator-gate.md
+    summary: Retired legacy live-test gate; its completed offline harness repair is retained without carrying forward the old session baseline.
+    status: closed
+    resolution: superseded
+    load_when:
+      - reviewing the historical PipeWire isolation repair or retired discriminator gate
+
+  - id: TASK-011
+    title: Direct-ALSA userspace isolation
+    path: docs/agents/tasks/closed/direct-alsa-userspace-isolation.md
+    summary: Replace oversized direct-ALSA kernel-pipe dependencies with exact bounded userspace playback and capture rings, proved offline at both supported rates.
+    status: closed
+    load_when:
+      - changing direct-ALSA loopback feeder or capture isolation
+      - investigating host kernel pipe-capacity admission
+      - preparing a direct-ALSA versus PipeWire continuity discriminator
+      - reviewing scripts/quantum2626_loopback_soak.py transport buffering
+
+  - id: TASK-012
+    title: Upstream driver backend integration
+    path: docs/agents/tasks/closed/upstream-driver-backend-integration.md
+    summary: Import the 2026-08-20 upstream RFC as the default source backend while preserving the in-house driver as the explicit fallback.
+    status: closed
+    load_when:
+      - building or updating the upstream snd-quantum backend
+      - changing the in-house versus upstream build selector
+      - integrating another developer's driver changes onto the upstream base
+      - preparing a live A/B between the two driver backends
+
+  - id: TASK-013
+    title: Upstream driver live activation
+    path: docs/agents/tasks/closed/upstream-driver-live-activation.md
+    summary: Retired one-time migration experiment; mixed discovery and cold-boot results remain evidence, not a pending activation plan.
+    status: closed
+    resolution: superseded
+    load_when:
+      - reviewing the original upstream activation failure and rollback evidence
+      - tracing the historical UCM discovery and cold-boot observations
+
+  - id: TASK-014
+    title: Upstream backend cleanup
+    path: docs/agents/tasks/closed/upstream-backend-cleanup.md
+    summary: Make backend build, install, and boot selection explicit and persistent while preserving the 48-kHz desktop default and both module artifacts.
+    status: closed
+    load_when:
+      - changing persistent in-house versus upstream backend selection
+      - installing either Quantum kernel backend
+      - reconciling the upstream switch, fallback, UCM, or boot policy
+
+  - id: TASK-015
+    title: Official RFC release integration
+    path: docs/agents/tasks/closed/rfc-release-integration.md
+    summary: Reconcile upstream-first research docs and release official RFC snapshots through verified distro DKMS builds.
+    status: closed
+    load_when:
+      - changing official RFC monitoring, release publication, or DKMS packaging
+      - reviewing distro support and release verification
+      - reconciling main-driver and unofficial collaboration documentation
