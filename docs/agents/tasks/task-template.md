@@ -2,7 +2,7 @@
 
 ## Status
 
-Backlog | Active | Blocked | Closed
+Backlog | Active | Blocked | Paused | Closed
 
 ## Objective
 
