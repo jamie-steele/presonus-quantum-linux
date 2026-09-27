@@ -83,10 +83,33 @@ entries:
       - hardware-testing
     status: current
 
+  - id: rfc-releases
+    title: Official RFC releases and distribution
+    path: docs/RELEASES.md
+    summary: Official mailing-list RFC discovery, source DKMS bundles, distro checks, and publication limits.
+    load_when:
+      - changing release workflows, DKMS packaging, or distro installation
+      - updating official RFC monitoring or release provenance
+    related:
+      - driver-development
+      - desktop-audio
+    status: current
+
+  - id: upstream-contributions
+    title: Upstream and collaboration contributions
+    path: CONTRIBUTING.md
+    summary: Nicholas Johnson attribution, unofficial EMATech collaboration, kernel RFC and UCM submission.
+    load_when:
+      - preparing driver or ALSA profile contributions
+      - documenting RFC authorship or collaboration repositories
+    related:
+      - rfc-releases
+    status: current
+
   - id: tasks-index
     title: Durable task index
     path: docs/agents/tasks/index.yml
-    summary: Routes substantial work and supports both single-file and nested task records.
+    summary: Routes open task records and the closed/index.yml archive, including nested task records.
     load_when:
       - starting or resuming multi-session, risky, or discovery-heavy work
       - recording decisions, validation, blockers, or handoff state
