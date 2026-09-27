@@ -1,18 +1,20 @@
 # Repository Map And Source Precedence
 
-PreSonus Quantum Linux aims to support the full Quantum interface family over time. The current
-out-of-tree Linux ALSA PCI driver is enabled and hardware-tested only for the Quantum 2626, a
-Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
+PreSonus Quantum Linux owns discovery, research, desktop integration, and experimental releases.
+The default out-of-tree backend is Nicholas Johnson's upstream RFC `snd-quantum`, enabled only
+for Quantum 2626, a Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
 
-The public family roadmap and support claims live in the support matrix in `README.md`. Treat the
-PCI table in `driver/snd-quantum2626.c` and hardware evidence in `notes/CURRENT_STATUS.md` as the
-authority for what is actually enabled and proven.
+The public support claims live in `README.md`. Check the selected backend's PCI table and
+`notes/CURRENT_STATUS.md` for what is enabled and proven. In-house evidence is not RFC evidence.
 
 ## Source Precedence
 
 | Path | Owns |
 | --- | --- |
-| `driver/snd-quantum2626.c` | Actual driver implementation and module parameters. |
+| `driver/upstream.lock` | Default RFC provenance; verified source is in the external cache. |
+| `driver/snd-quantum2626.c` | In-house research fallback and its module parameters only. |
+| `CONTRIBUTING.md` | Nicholas's RFC, EMATech collaboration, kernel and UCM submission. |
+| `docs/RELEASES.md` | Experimental source/DKMS releases and distro verification. |
 | `notes/CURRENT_STATUS.md` | Latest consolidated experimental status and known blockers. |
 | `notes/REGISTER_GUESSES.md` | Register hypotheses, confidence, and supporting observations. |
 | `notes/GHIDRA_FINDINGS_SUMMARY.md` | Consolidated static-analysis findings. |
@@ -36,7 +38,9 @@ authority for what is actually enabled and proven.
 
 ## Current State
 
-As of the consolidated status dated 2026-08-15 in `notes/CURRENT_STATUS.md`:
+The following is historical in-house evidence from the 2026-08-15 checkpoint,
+not current RFC acceptance. Read the later backend and reinstall checkpoints in
+`notes/CURRENT_STATUS.md` before using it:
 
 - The module performs a bounded TCI mailbox startup and read-only readiness handshake for the
   verified `1c67:0104` device.

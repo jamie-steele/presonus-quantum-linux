@@ -2,24 +2,23 @@
 
 ## Short Description (for GitHub About section)
 
-Experimental PreSonus Quantum family Linux support; Quantum 2626 playback, capture, and PipeWire integration are live-proven
+PreSonus Quantum Linux research, desktop integration, and experimental releases of Nicholas Johnson's upstream RFC driver
 
 ## Detailed Description
 
-This repository aims to provide community-developed Linux audio support for the
-full PreSonus Quantum family. Today, its experimental Linux ALSA PCI driver is
-enabled and hardware-tested only for the Quantum 2626 Thunderbolt 3 interface.
-On owned hardware, the current driver reaches the solid-blue ready state and
-provides live-proven playback, capture, and bounded duplex operation through
-direct ALSA and PipeWire.
+This repository develops discovery/research, desktop integration, and experimental
+distribution around Nicholas Johnson's official `snd-quantum` RFC. The RFC is the
+default backend, with the earlier in-house driver retained for research and recovery.
+Only Quantum 2626 is enabled and hardware-tested. EMATech/quantum is an unofficial
+collaboration adaptation; official RFC submissions drive release detection.
 
 ### Key Features
 
-- Out-of-tree ALSA PCI driver for Linux
-- Fixed 48 kHz, 26-channel, S32_LE duplex transport
+- Pinned official RFC source with experimental DKMS releases and distro build checks
+- Fixed 48 kHz, 26-channel, S32_LE desktop profile
 - ALSA UCM profile with 13 stereo output sinks and 26 independent mono inputs
 - Hardware DMA page tables, interrupts, and position tracking
-- TCI initialization and channel routing recovered primarily from the macOS DriverKit extension
+- Protocol discovery and hardware evidence, including the earlier in-house implementation
 
 ### Target Audience
 
@@ -31,10 +30,10 @@ direct ALSA and PipeWire.
 
 ### Project Status
 
-Active development. Audio works at the fixed, live-proven 48 kHz profile.
-Sample-rate switching, mixer controls, MIDI, hot removal, and physical digital-I/O
-validation are not implemented or proven yet.
+Experimental. In-house playback/capture results and mixed RFC hardware evidence are
+reported separately. The RFC implements rate/clock controls, MIDI, and removal handling;
+sustained stability, high rates, and physical digital-I/O validation remain incomplete.
 
 ### Website/Homepage (if applicable)
 
-https://github.com/jamie-steele/presonus-quantum-linux
+https://github.com/jamie-steele/presonus-quantum2626-linux

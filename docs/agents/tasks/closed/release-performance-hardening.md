@@ -2,6 +2,16 @@
 
 ## Status
 
+Closed; the bounded in-house performance work was completed. Its stale active
+index entry was retired on 2026-09-27 after adopting the upstream RFC as the main driver.
+
+The progress, old host settings, and proposed follow-ups below are historical
+in-house evidence, not a current implementation backlog or upstream operating contract.
+Current limitations belong in `notes/CURRENT_STATUS.md`; any new investigation
+must start from a reproduced issue on the selected upstream revision.
+
+### Recorded Progress
+
 Native 44.1 kHz desktop playback is live-proven at 26-channel S32_LE, 128-frame periods, and a
 512-frame hardware buffer. Playback-only `slowptr true`, 256 frames of PipeWire headroom, and the
 System76 Scheduler exception materially reduce the fault, but occasional pops remained. A bounded
@@ -15,10 +25,8 @@ though the 2-us request demonstrably suppressed deep idle and every transport/sc
 remained clean. The exact QoS-only discriminator is now installed and loaded: PipeWire returned to
 32 resolution bits while 44.1 kHz, 128/512 hardware geometry, headroom, endpoint inventory, and
 realtime scheduling remain fixed. User-started playback is immediately clean and received the
-strongest acceptance yet. A later NeuralRack test exposed a distinct native-44.1 duplex lifecycle
-failure: capture-first startup silenced playback, capture teardown restored playback with crackle,
-and a complete playback-only close/reopen restored clean audio. Preserve the accepted playback
-configuration while fixing live duplex reconfiguration separately. A narrow offline candidate now
+strongest acceptance yet. Preserve the accepted playback configuration while fixing live duplex
+reconfiguration separately. A narrow offline candidate now
 replaces one-sided live DMA-table rebuilds with persistent fixed playback/capture buffers, ALSA
 synchronized-start handling, and a late-direction wait for the next hardware-ring wrap. The exact
 refined build is installed and loaded, and playback returned at native 44.1 kHz/128/512. Desktop
@@ -93,7 +101,7 @@ the proven fixed 48 kHz transport.
   retain 128-frame periods and request exactly four periods through alsa-lib's direct-plugin
   `periods` field. The installed UCM now matches these bytes; actual hardware geometry remains
   unknown until playback opens the PCM.
-- `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md` records the functional playback, capture, and
+- `docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md` records the functional playback, capture, and
   duplex implementation completed by TASK-001.
 - The validated installed module hash on 2026-08-15 is
   `890dcde7ee8825c15492ead1e94acdfaf32be43462d645a6b070327c79ea6578`.
@@ -1112,25 +1120,6 @@ the proven fixed 48 kHz transport.
   appeared. This cleanly separates the successful QoS-only candidate from the failed combined
   `msbits=24` build. Treat it as strong immediate acceptance, not yet long-duration release
   acceptance, because earlier artifacts sometimes degraded only after additional listening.
-- **Native-44.1 live-duplex failure isolated, 2026-08-16:** the user connected NeuralRack's JACK
-  client from Quantum Mic/Instrument Input 1 to Main left/right while Firefox was also linked to
-  Main. PipeWire showed the source, NeuralRack, Main, and Firefox links exactly as intended. At
-  14:57:09 the driver prepared and started capture-only `directions=0x2`, stopped after zero IRQs,
-  rebuilt exact 53,248-byte 128/512 resources for `directions=0x3`, and resumed only the previously
-  running capture mask `0x2`. Source inspection confirms the later playback trigger joins an
-  already-running engine without another hardware restart. Both PCMs then reported RUNNING at
-  44.1 kHz, 26-channel S32_LE and 128/512 geometry, all three PipeWire nodes retained zero errors,
-  Pulse remained responsive, and no kernel or user-audio fault appeared, but NeuralRack and
-  Firefox were both inaudible. Closing NeuralRack at 15:06:57 stopped the duplex engine after
-  202,639 IRQs, rebuilt playback-only `directions=0x1`, and resumed playback; capture closed and
-  Firefox became audible but crackled. Playback geometry and zero graph errors remained exact,
-  both PipeWire data loops retained `SCHED_RR` priority 20, and CPU0 C2/C3 usage counters remained
-  frozen, proving the driver QoS request was still active. The user then paused YouTube for ten
-  seconds so playback fully closed and reopened; playback returned clean. This is an observed
-  44.1-kHz live-duplex lifecycle failure below PipeWire error accounting, not a regression in the
-  accepted steady playback geometry, scheduling, or QoS candidate. The leading source seam is
-  pointer/period phase continuity when the second direction late-joins the rebuilt joint engine;
-  fix and validate that transition before reopening NeuralRack or claiming native-44.1 duplex.
 - **Offline native-44.1 duplex lifecycle candidate, 2026-08-16:** the source now allocates fixed
   playback and capture PCM buffers at PCM construction and programs both stable DMA addresses when
   either direction first prepares. Adding or freeing one direction therefore no longer stops,
@@ -1150,8 +1139,7 @@ the proven fixed 48 kHz transport.
   exactly 13 Quantum sinks plus 26 sources restored. Ordinary playback reopened at native
   44.1 kHz, 26-channel S32_LE, 128-frame periods, and a 512-frame buffer while capture remained
   closed. The bounded activation log contains no xrun, DMA fault, timeout, warning, BUG, or oops.
-  This proves exact activation and playback-control preservation, not the repaired transition;
-  NeuralRack must now add and remove capture while playback remains active.
+  This proves exact activation and playback-control preservation, not the repaired transition.
 - **Playback-only regression discriminator, 2026-08-16:** before any capture late join, the user
   reported persistent pops during YouTube Music playback; a ten-second pause did not clear them.
   ALSA remained native 44.1 kHz, 26-channel S32_LE at 128/512, capture stayed closed, PipeWire
@@ -1403,63 +1391,9 @@ the proven fixed 48 kHz transport.
   `quantum2626_mono_in:P2626,0,0`; its suspended state is normal while no client is linked.
   Reclassify 13/0 as a startup checkpoint rather than the final stable graph. Capture remains
   closed, so this proves endpoint recovery but not native-44.1 duplex behavior.
-- **Malformed NeuralRack route rejected as duplex evidence, 2026-08-16:** the locally built
-  standalone app launched at 44.1 kHz/256 JACK frames. Source inspection confirms
-  `neuralrack:in` is MIDI, `neuralrack:in_0` is its single audio input, and `out_0`/`out_1` are
-  stereo audio outputs. PipeWire accepted an incorrect Input 1 audio link to the MIDI port; after
-  the real audio input was also linked, NeuralRack emitted an xrun and segfaulted in its userspace
-  `pw-data-loop`. The Quantum hardware reached exact joint 44.1 kHz/26-channel S32_LE/128/512
-  geometry without a Quantum, DMAR, or IOMMU fault. Client exit removed its links, capture closed,
-  and Firefox playback remained linked at the same geometry. Do not classify this malformed-route
-  crash as a driver or duplex result. A clean test uses only Input 1 to `neuralrack:in_0`, then
-  `out_0`/`out_1` to Main left/right.
-- **Clean NeuralRack routing retry live, 2026-08-16:** a freshly launched standalone client remains
-  running at 44.1 kHz/256 JACK frames with only the intended three audio links: Input 1 to
-  `neuralrack:in_0`, `out_0` to Main left, and `out_1` to Main right. Playback and capture are both
-  open at exact 44.1 kHz/26-channel S32_LE/128/512 geometry. One connection-time xrun appeared in
-  NeuralRack's terminal, but the client and links remained present and no Quantum, DMAR, IOMMU,
-  timeout, fault, BUG, or oops marker appeared in the bounded kernel log. Audible validation is
-  pending.
-- **NeuralRack model-enable crash classified outside the driver, 2026-08-16:** the user heard the
-  correctly routed live input before enabling the saved JC-40 model crashed NeuralRack. The second
-  segfault reproduced the first executable offset `0x3904e` on another CPU. An exact unstripped
-  relink maps that offset to the post-model `memcpy` in `NeuralModelLoader::compute()`, whose local
-  implementation uses variable-length realtime stack buffers. The saved model is a supported
-  48-kHz NAM 0.7 `SlimmableContainer`. Client exit removed the links, capture closed, Firefox
-  playback remained at exact 44.1 kHz/26-channel S32_LE/128/512, and no Quantum, DMAR, or IOMMU
-  fault appeared. This proves routing and duplex transport reached the app but does not complete an
-  audible processed-guitar test. Treat preallocated app buffers as the narrow next discriminator;
-  do not change the driver or stable desktop geometry for this userspace crash.
-- **NeuralRack app-side discriminator built offline, 2026-08-16:** a separate temporary source copy
-  now gives `NeuralModelLoader` reusable process and resample buffers prepared outside its realtime
-  callback, includes capacity guards, and expands the NAM model's maximum block size for 44.1-to-
-  48-kHz resampling. The standalone build succeeded at hash `a26a3ed9...dee8`, links against the
-  system PipeWire JACK library, and its `compute()` disassembly has one fixed 24-byte stack frame
-  with no allocation call. This is build/disassembly proof, not runtime acceptance. The candidate
-  remains `/tmp/neuralrack-debug.gY9Hq1/bin/Neuralrack`; no launch, PipeWire link, restart, driver
-  action, or model processing followed the offline build. Live launch and correct three-link routing
-  remain a separate boundary.
-- **NeuralRack fixed-build live discriminator, 2026-08-16:** the temporary fixed app survived model
-  enable at the intended Input 1 -> `in_0` -> Main route, so the variable-stack-buffer crash fix is
-  effective. The user heard processed audio with many pops while exact duplex 44.1 kHz/26-channel
-  S32_LE/128/512 geometry held. Main consumed only 0.02--0.03 of its PipeWire deadline, Input 1
-  effectively zero, bounded error totals did not advance, and no driver or app crash appeared. An
-  offline probe of the exact `StreamingResampler` chain shows 256-frame callbacks producing 253,
-  255, 256, or 257 return frames. `NeuralModelLoader::compute()` discards that count and copies 256
-  unconditionally, creating stale or dropped block-edge samples. Treat proper output-frame
-  accumulation as the next app-only fix; do not alter the Quantum driver or stable graph geometry.
-- **NeuralRack exact-block output fix built offline, 2026-08-16:** after the user closed the app,
-  the temporary candidate gained a preallocated circular return queue primed with eight frames
-  (about 0.18 ms). It retains all 253--257 produced frames and consumes exactly 256 per callback,
-  with no realtime allocation. The exact rate chain stayed within -3..0 cumulative frames over one
-  million blocks. A 10,000-block 1-kHz A/B reduced the maximum adjacent step from 0.449398 on the
-  original copy-256 path to 0.150643 on the queued path, ending with five frames buffered. Build
-  `4c2913b3...321f` succeeds; `compute()` has a fixed 40-byte stack frame and no allocator call.
-  This updated `/tmp/neuralrack-debug.gY9Hq1/bin/Neuralrack` remains unlaunched and unlinked; live
-  JC-40 plus cabinet validation is the next separate boundary.
 - **Overnight ordinary-playback recurrence observed, 2026-08-17:** the user returned to occasional
   mild Firefox pops after all three desktop-audio services had run since 17:52 August 16 with zero
-  restarts. NeuralRack is not running, capture is closed, and exact native 44.1 kHz/26-channel
+  restarts. Capture is closed, and exact native 44.1 kHz/26-channel
   S32_LE/128/512 remains active. Main's actual quantum is 256 despite an unforced global default of
   1024. PipeWire logged `spa.audioconvert: out of buffers` with one suppressed repetition at 20:22;
   Main's accumulated error count rose from the earlier 19 to 29 and active Firefox has one. Those

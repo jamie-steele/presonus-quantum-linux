@@ -57,15 +57,16 @@ Before any live command:
    ADAT Input 1 return. Do not include a synth output or active mixer bus.
 4. Begin at the harness default `-30 dBFS`. The harness refuses levels above `-20 dBFS` or below
    `-50 dBFS`.
-5. Preserve the accepted desktop baseline: native 44.1 kHz, 26-channel S32_LE, 128-frame hardware
-   periods, and a 512-frame hardware buffer. Do not combine this test with a service restart,
+5. Preserve the selected native desktop baseline: 44.1 or 48 kHz, 26-channel S32_LE, 128-frame
+   hardware periods, and a 512-frame hardware buffer. Pass that exact live rate through `--rate`;
+   the harness validates it but never switches it. Do not combine this test with a service restart,
    module change, UCM/WirePlumber edit, graph-quantum override, or CPU-policy experiment.
 
 After it opens both directions, the harness reads `/proc/asound/P2626` and aborts unless both PCMs
 have the exact baseline geometry. It also aborts on endpoint/process loss, capture at or above 0.95
 full scale, failure to acquire the sequence, loss of the required geometry, low disk space, the
 configured event limit, or failure to regain global phase lock within 16 analysis blocks (about
-1.49 seconds of captured audio).
+1.49 seconds at 44.1 kHz or 1.37 seconds at 48 kHz).
 
 The harness opens the test playback first and then joins capture 250 ms later. This preserves the
 accepted playback-first control and intentionally exercises the driver's late-capture path. It does
@@ -82,12 +83,14 @@ recovery:
 cd /home/jamie/source/Quantum2626
 python3 -m py_compile scripts/quantum2626_loopback_soak.py
 python3 scripts/quantum2626_loopback_soak.py self-test
+python3 scripts/quantum2626_loopback_soak.py self-test --transport pipewire
+python3 scripts/quantum2626_loopback_soak.py self-test --transport alsa
 ```
 
 Expected distinguishing output includes:
 
 ```json
-{"beyond_window_delta_frames":1024,"capture_extractor_ready_handshake":true,"direct_alsa_pipe_bytes":1048576,"isolated_pipewire_capture":true,"persistent_loss_events":1,"pipewire_capture_buffer_seconds":5.944308,"pipewire_capture_pipe_bytes":1048576,"pipewire_data_loop_telemetry":true,"pipewire_error_transition_telemetry":true,"process_scheduling_telemetry":true,"recovered_after_blocks":5,"repeated_period_delta_frames":-128,"result":"pass","rtkit_helper_ab_prepared":true,"skipped_period_delta_frames":128,"terminal_snapshot_before_reap":true,"thread_scheduling_telemetry":true}
+{"capture_extractor_ready_handshake":true,"direct_alsa_capture_isolation_bytes":1048576,"direct_alsa_isolation_mode":"userspace_byte_rings","direct_alsa_playback_isolation_bytes":1048576,"pipewire_capture_isolation_bytes":1048576,"result":"pass","supported_live_rates":[44100,48000],"transport":"all","userspace_buffer_capacity_enforced":true}
 ```
 
 `replay` performs a read-only global classification of every retained event capture. It validates
@@ -124,6 +127,7 @@ Use a new output directory; the harness refuses to overwrite one:
 ```bash
 python3 scripts/quantum2626_loopback_soak.py run \
   --duration 05:00 \
+  --rate 44100 \
   --output-dir /tmp/quantum2626-loopback-calibration \
   --level-dbfs -30 \
   --capture-fragment quantum2626_mono_in_P2626_0_10__source \
@@ -133,7 +137,7 @@ python3 scripts/quantum2626_loopback_soak.py run \
 Calibration is accepted only when all of the following hold:
 
 - the physical path is confirmed as Out 3 to the explicitly selected return endpoint;
-- both ALSA directions read back as 44.1 kHz, 26-channel S32_LE, 128/512;
+- both ALSA directions read back at the exact selected `--rate`, 26-channel S32_LE, 128/512;
 - the captured peak remains below -6 dBFS and above the no-signal floor;
 - initial absolute correlation is at least 0.45 and stays stable;
 - the program reaches `duration_complete` without a fail-closed stop;
@@ -194,13 +198,21 @@ The test does not retain eight hours of raw PCM. It writes:
 - `capture-extractor.stderr`: diagnostics from the isolated capture drainer.
 
 The playback feeder runs in a dedicated process. This is intentional: global recovery is
-substantially more expensive than normal tracking, and keeping playback in a Python thread would
-allow analyzer GIL contention to amplify one discontinuity into additional `pw-play` underruns.
-Both transports now start a dedicated capture extractor before the capture helper. PipeWire passes
-its mono stream through unchanged; direct ALSA extracts hardware channel index two from the
-26-channel stream. Raw capture and extracted mono each use a required 1 MiB pipe, enough for 5.944
-seconds of mono S32_LE at 44.1 kHz and longer than the analyzer's 1.486-second fail-closed loss
-window. Missing capacity fails before geometry admission.
+substantially more expensive than normal tracking, and keeping playback in the analysis process
+would allow analyzer GIL contention to amplify one discontinuity into additional underruns. Direct
+ALSA pre-fills an exact, bounded 1 MiB userspace byte ring inside that feeder before admission. At
+26-channel S32_LE this retains 0.229 seconds of playback isolation at 44.1 kHz or 0.210 seconds at
+48 kHz, exceeding the 512-frame hardware buffer by more than an order of magnitude.
+
+Both transports start a dedicated capture extractor before the capture helper. The extractor
+continuously drains its raw input, selects the configured mono channel, and passes that stream
+through an exact, bounded 1 MiB userspace byte ring. This retains 5.944 seconds of mono S32_LE
+capture isolation at 44.1 kHz or 5.461 seconds at 48 kHz. Direct ALSA still extracts hardware
+channel index two from the exact 26-channel stream; PipeWire still passes mono channel zero through
+unchanged. Surrounding kernel pipes are ordinary transport edges and are read back for evidence but
+are never enlarged. Offline fixtures fill the shared ring to its exact bound, cross multiple wrap
+points, prove byte-exact PipeWire and 26-channel direct-ALSA extraction, and require exact playback
+and capture capacity handshakes. Missing userspace isolation fails before geometry admission.
 
 Every telemetry sample records scheduler policy, priority, nice level, context switches, runtime,
 wait time, and timeslices for the helpers, feeder, extractor, and their individual threads.
@@ -240,8 +252,8 @@ For the PipeWire discriminator, interpret the structured scheduling and ERR evid
 
 - Output-node plus `pw-play` transitions with stable helper/data-loop scheduling favor the playback
   graph or its ALSA adapter.
-- `pw-record` transitions are capture-client evidence only after the isolated extractor and both
-  1 MiB capacities remain admitted; a zero capture-node ERR count does not itself prove clean
+- `pw-record` transitions are capture-client evidence only after the isolated extractor and the
+  required 1 MiB isolation capacity remain admitted; a zero capture-node ERR count does not itself prove clean
   captured content.
 - Simultaneous scheduling wait growth across separate playback and capture graphs favors a shared
   scheduling boundary. `pw-top` ERR samples remain interval evidence, not exact causal timestamps.
