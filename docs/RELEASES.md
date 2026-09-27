@@ -71,15 +71,29 @@ chosen fallback policy if needed.
 
 ## APT updates
 
-**Not activated by this code change:** the signed APT feed requires maintainer
-setup below. Until a production fingerprint and live URL are announced, use the
-release DEB. A local `.deb` installation alone does not subscribe to new releases.
+The configured production endpoint is
+[jamie-steele.github.io/presonus-quantum-linux](https://jamie-steele.github.io/presonus-quantum-linux/).
+A local `.deb` installation alone does not subscribe to new releases. The files
+below become available after the first successful signed-repository deployment.
 
-Once activated, use the announced HTTPS Pages base URL as `APT_URL`. Download
-`quantum-archive-keyring.gpg` and `quantum.sources` from that URL. Inspect the source
-file and compare `gpg --show-keys --with-fingerprint quantum-archive-keyring.gpg`
-against the fingerprint published by the maintainer in this repository, not just a
-fingerprint downloaded from the same APT server. Then:
+The dedicated signing key expires on **2027-09-27**. Its full fingerprint is:
+
+```text
+5F839BAB8E48F6572044A442D98AC6B03628D7BE
+```
+
+The [public key](../packaging/native/apt-signing-key.asc) is retained in Git for
+independent verification. Download the keyring and source configuration:
+
+```bash
+APT_URL=https://jamie-steele.github.io/presonus-quantum-linux
+curl -fsSLo quantum-archive-keyring.gpg "$APT_URL/quantum-archive-keyring.gpg"
+curl -fsSLo quantum.sources "$APT_URL/quantum.sources"
+gpg --show-keys --with-fingerprint quantum-archive-keyring.gpg
+```
+
+Confirm the fingerprint matches the value above and inspect `quantum.sources`
+before installing either file. Then:
 
 ```bash
 sudo install -d -m 0755 /etc/apt/keyrings
