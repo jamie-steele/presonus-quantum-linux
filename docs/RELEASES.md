@@ -10,21 +10,64 @@ messages, patch hashes, reconstructed source hash, and packaging commit.
 The native-package workflow adds `quantum-dkms` DEB and RPM assets to an existing
 RFC release after install/upgrade/removal tests. These are **source/DKMS packages**,
 not precompiled kernel modules. Native packages currently target **x86_64 only**:
-Ubuntu 24.04, Debian 13, Fedora 43, and openSUSE Tumbleweed. Arch continues to use
+Ubuntu 22.04/24.04, Debian 12/13, Fedora 43, and openSUSE Tumbleweed. Arch continues to use
 the source installer below. No live host installation is implied by these checks.
+
+### Distribution compatibility
+
+| System | Package path | Compatibility boundary |
+| --- | --- | --- |
+| Ubuntu 22.04 / 24.04 | Signed APT or DEB | Native lifecycle, stock dependencies and UCM parsing are release gates. |
+| Pop!_OS 22.04 / 24.04 | Same APT feed / DEB | Ubuntu-base coverage; System76 kernels, boot hooks and desktop sessions require separate validation. |
+| Linux Mint 21.x / 22.x | Same APT feed / DEB | Ubuntu 22.04 / 24.04 base coverage, not a claim of Mint desktop or hardware acceptance. |
+| Debian 12 / 13 | Same APT feed / DEB | Native lifecycle, stock dependencies and UCM parsing are release gates. |
+| Fedora 43 | `.fc43.x86_64.rpm` | Fedora-specific dependencies and native lifecycle checks. |
+| openSUSE Tumbleweed | `.suse.x86_64.rpm` | SUSE-specific dependencies and native lifecycle checks. |
+| Arch Linux | Source/DKMS archive | Rolling kernel build, source install/remove and staged audio checks; no native Arch package yet. |
+
+[Mint 21](https://www.linuxmint.com/rel_vanessa_cinnamon.php) and
+[Mint 22](https://www.linuxmint.com/rel_wilma_cinnamon.php) document their Ubuntu
+bases. Derivatives can override packages, kernels and session managers, so a base
+container test is not a full derivative test. Other releases and architectures
+are not covered by this matrix.
+
+Packaging revision **2** fixes the revision-1 `dkms (>= 3)` dependency that blocked
+Pop!_OS 22.04. The DEB accepts the stock Jammy DKMS 2.8.7 and retains support for
+DKMS 3. Its desktop profile uses UCM Syntax 4 without newer macros, compatible
+with Jammy's ALSA parser while preserving the same 13 stereo outputs and 26 mono
+inputs. Do not force dependencies or replace your distro's DKMS to install an
+older Quantum package. Revision 2 is published and was verified through the live
+signed APT feed from a fresh Jammy container on 2026-09-27.
+
+Desktop integration targets **PipeWire with WirePlumber 0.4 or 0.5**. Our package
+scripts do not restart or reconfigure a user's audio session, but distro package
+dependencies/recommendations can propose audio-server changes. The APT commands
+below disable optional recommendations and refuse removals; review the proposed
+transaction before accepting. On an older Mint/Ubuntu desktop, inspect `pactl info` and follow the
+distro's supported audio-session setup before expecting the WirePlumber policy
+to apply. Direct ALSA support and desktop endpoint discovery are separate checks.
+
+Install headers matching your distro's exact kernel, including Pop!_OS or HWE
+kernels. Keep Secure Boot enrollment and custom backend/module-load rules under
+local control. Never disable package signature checks to work around another
+repository's GPG warning.
 
 Download the package for your distro and its `native-<revision>-SHA256SUMS` from
 the same release. Verify your selected file with `sha256sum` against its entry;
 `sha256sum --ignore-missing -c native-<revision>-SHA256SUMS` checks downloaded assets.
 The revision suffix is independent of the RFC: packaging fixes increase `-1` to
 `-2` without claiming a new upstream submission. DKMS uses that full version too.
+The driver source comes unchanged from the verified source archive. Native audio
+profiles come from the packaging commit, allowing compatibility fixes without
+replacing an immutable source release. `native-<revision>-manifest.json` records
+their SHA-256 hashes as well as the original RFC provenance and packaging commit.
 
 Install headers for the kernel you will boot before installing the package:
 
 ```bash
 # Ubuntu / Debian: then use the exact downloaded filename in place of <version>.
 sudo apt install linux-headers-$(uname -r)
-sudo apt install ./quantum-dkms_<version>_amd64.deb
+sudo apt install --no-install-recommends --no-remove ./quantum-dkms_<version>_amd64.deb
 
 # Fedora 43:
 sudo dnf install kernel-devel-$(uname -r)
@@ -100,7 +143,7 @@ sudo install -d -m 0755 /etc/apt/keyrings
 sudo install -m 0644 quantum-archive-keyring.gpg /etc/apt/keyrings/
 sudo install -m 0644 quantum.sources /etc/apt/sources.list.d/quantum.sources
 sudo apt update
-sudo apt install linux-headers-$(uname -r) quantum-dkms
+sudo apt install --no-install-recommends --no-remove linux-headers-$(uname -r) quantum-dkms
 ```
 
 The feed uses a dedicated `Signed-By` key and an opt-in `experimental` suite.
@@ -235,11 +278,22 @@ Multipart full driver submissions work; incremental patches needing a kernel bas
 or a changed module layout fail visibly and require a packaging update. No failed
 candidate is silently published or skipped. Backlogs drain one series per run.
 
-The same archive is checked on Ubuntu 24.04, Debian 13, Fedora 43, openSUSE
+New source archives are checked on Ubuntu 22.04/24.04, Debian 12/13, Fedora 43, openSUSE
 Tumbleweed, and Arch x86_64. Each disposable container installs its own kernel
 headers and tests DKMS build/install/remove, UCM parsing, and staged copies of both
 WirePlumber formats and backend policy. Logs record image digest, distro, and exact
 kernel. Rolling images can reveal new kernel incompatibilities and block release.
+
+Native-package tests also run on pull requests, without release-write permission
+or publication. The signed-APT tests resolve package dependencies against each
+Ubuntu/Debian base's real repositories, in addition to verifying signatures,
+downloads, upgrade selection and rejection of tampered/expired metadata.
+Native lifecycle tests parse the installed package's UCM profile, not just the
+source archive's profile. Evidence paths are unique per distro release.
+
+The original `rfc-20260820.rfc1.s1148921` source archive remains immutable and has
+the older Syntax-6 UCM and WirePlumber version probe. Jammy users should use native
+revision 2 or newer; those source-installer fixes apply to newly generated bundles.
 
 Only a successful full matrix permits publication. The publisher has a separate
 write token, does not build upstream code, and uploads all assets to a draft before
@@ -253,6 +307,17 @@ build reproducible. GitHub's automatic repository source archives are the packag
 repository; download the attached `quantum-*.tar.gz` for the complete driver bundle.
 
 ## What the checks establish
+
+[TASK-017](agents/tasks/closed/distribution-compatibility.md) records the expanded
+revision-2 compatibility checks. Native publishing run
+[36347531804](https://github.com/jamie-steele/presonus-quantum-linux/actions/runs/36347531804)
+passed all six lifecycle and four signed-APT jobs; deployment
+[36347753129](https://github.com/jamie-steele/presonus-quantum-linux/actions/runs/36347753129)
+published the refreshed feed. A fresh Jammy client verified the production key,
+selected revision 2, resolved dependencies with stock DKMS 2.8.7, downloaded the
+authenticated DEB and parsed its extracted UCM profile without opening hardware.
+The DEB SHA-256 was
+`34bdded811d7e5b0efe2ea366b7c60ca0f1a2b5dbadaedf976bcc6f62c6239af`.
 
 [TASK-016](agents/tasks/closed/native-package-distribution.md) records local native
 install/reinstall/upgrade/removal checks for Ubuntu, Debian, Fedora, and openSUSE,
