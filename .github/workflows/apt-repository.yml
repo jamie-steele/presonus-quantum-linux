@@ -1,0 +1,73 @@
+name: Quantum signed APT repository
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Quantum native packages, Quantum RFC builds and releases]
+    types: [completed]
+  schedule:
+    # Refresh the signed metadata before its 14-day expiry, even without a new RFC.
+    - cron: '41 5 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quantum-apt-pages
+  cancel-in-progress: false
+
+jobs:
+  repository:
+    if: >-
+      vars.APT_REPOSITORY_ENABLED == 'true' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+        github.event.workflow_run.head_repository.full_name == github.repository)) &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    environment: apt-signing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/configure-pages@v5
+        id: pages
+      - name: Assemble verified packages and sign metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          APT_SIGNING_FINGERPRINT: ${{ vars.APT_SIGNING_FINGERPRINT }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y apt-utils gnupg
+          python3 scripts/release/apt_repository.py download "$REPOSITORY" packages
+          export GNUPGHOME
+          GNUPGHOME=$(mktemp -d)
+          trap 'gpgconf --kill gpg-agent; rm -rf "$GNUPGHOME"' EXIT
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$APT_SIGNING_KEY" | gpg --batch --import
+          unset APT_SIGNING_KEY
+          python3 scripts/release/apt_repository.py build packages public \
+            --fingerprint "$APT_SIGNING_FINGERPRINT" --base-url "$BASE_URL"
+          gpgv --keyring "$PWD/public/quantum-archive-keyring.gpg" public/dists/experimental/InRelease
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy:
+    needs: repository
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
