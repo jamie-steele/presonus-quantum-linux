@@ -6,7 +6,7 @@ native=${1:?native package directory required}
 upgrade=${2:?upgrade package directory required}
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends apt-utils gnupg python3 ca-certificates
+apt-get install -y --no-install-recommends apt-utils gnupg gpgv python3 ca-certificates
 work=$(mktemp -d)
 chmod 755 "$work"
 export GNUPGHOME="$work/gnupg"
