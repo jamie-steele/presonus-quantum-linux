@@ -1,0 +1,155 @@
+name: Quantum RFC builds and releases
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      series:
+        description: 'Patchwork series ID (blank detects the oldest unreleased RFC)'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quantum-rfc-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.prepare.outputs.ready }}
+      tag: ${{ steps.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test release tooling
+        run: python3 -m unittest discover -s tests -v
+      - name: Prepare complete RFC source bundle
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          REQUESTED_SERIES: ${{ inputs.series }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == schedule || "$EVENT" == workflow_dispatch ]]; then
+            series="$REQUESTED_SERIES"
+            if [[ -z "$series" ]]; then
+              series=$(python3 scripts/release/upstream_release.py discover --repository "$REPOSITORY")
+            fi
+          else
+            series=$(python3 scripts/release/upstream_release.py pinned-series)
+          fi
+          if [[ -z "$series" ]]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$series" =~ ^[0-9]+$ ]]
+          python3 scripts/release/upstream_release.py prepare --series "$series" --output /tmp/quantum-bundle
+          tag=$(python3 -c 'import json; print(json.load(open("/tmp/quantum-bundle/manifest.json"))["tag"])')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: steps.prepare.outputs.ready == 'true'
+        with:
+          name: source-bundle
+          path: /tmp/quantum-bundle/
+          if-no-files-found: error
+
+  distro:
+    needs: prepare
+    if: needs.prepare.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - family: ubuntu
+            image: ubuntu:24.04
+          - family: debian
+            image: debian:13
+          - family: fedora
+            image: fedora:43
+          - family: opensuse
+            image: opensuse/tumbleweed:latest
+          - family: arch
+            image: archlinux:latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: source-bundle
+          path: bundle
+      - name: Build and stage in the distro container
+        env:
+          FAMILY: ${{ matrix.family }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          mkdir evidence
+          docker pull "$IMAGE"
+          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' > "evidence/$FAMILY-image.json"
+          docker run --rm --cap-drop=ALL --cap-add=CHOWN --cap-add=DAC_OVERRIDE --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID \
+            -v "$PWD:/workspace:ro" -v "$PWD/evidence:/evidence" \
+            "$IMAGE" bash /workspace/scripts/release/test-distro.sh "$FAMILY" /workspace/bundle /evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-${{ matrix.family }}
+          path: evidence/
+
+  publish:
+    needs: [prepare, distro]
+    if: >-
+      needs.prepare.outputs.ready == 'true' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: source-bundle
+          path: bundle
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: evidence-*
+          path: evidence
+          merge-multiple: true
+      - name: Publish tested RFC as an experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --json isDraft > existing.json; then
+            if [[ $(jq -r .isDraft existing.json) == false ]]; then
+              echo 'Release already published; leaving it unchanged.'
+              exit 0
+            fi
+          else
+            gh release create "$TAG" --target "$COMMIT" --draft --prerelease \
+              --title "Quantum $TAG" --notes-file bundle/release-notes.md
+          fi
+          gh release edit "$TAG" --target "$COMMIT" --notes-file bundle/release-notes.md
+          tar -czf bundle/distro-build-evidence.tar.gz evidence
+          (cd bundle && sha256sum -c SHA256SUMS)
+          gh release upload "$TAG" bundle/quantum-*.tar.gz bundle/SHA256SUMS \
+            bundle/manifest.json bundle/distro-build-evidence.tar.gz --clobber
+          gh release edit "$TAG" --draft=false --prerelease --latest=false

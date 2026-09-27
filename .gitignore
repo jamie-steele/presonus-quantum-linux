@@ -9,6 +9,10 @@
 !alsa/ucm2/conf.d/
 !alsa/ucm2/conf.d/**
 
+# Backend-selection templates are modprobe configuration, not dependency files.
+!driver/modprobe.d/
+!driver/modprobe.d/**
+
 # Python cache files
 __pycache__/
 *.py[cod]
@@ -63,6 +67,10 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# Pinned upstream source is fetched outside the repository. This ignored
+# symlink is only the Kbuild bridge to that external cache.
+driver/.upstream-src
+
 # debug information files
 *.dwo
 
@@ -77,6 +85,7 @@ tools/
 *.rep/
 *.lock
 *.ulock
+!driver/upstream.lock
 
 # Generated trace-analysis output; retain conclusions under notes/ instead
 scripts/trace_analysis/*.txt

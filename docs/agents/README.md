@@ -21,7 +21,10 @@ distinct concern. Link to source documents instead of copying large sections fro
 ## Sources Of Truth
 
 - Product and project status belongs in the root `README.md` and focused files under `notes/`.
-- Driver behavior belongs in `driver/snd-quantum2626.c`, with build usage in `driver/README.md`.
+- Default driver behavior belongs in the RFC source pinned by `driver/upstream.lock`;
+  `driver/snd-quantum2626.c` owns only the fallback. Build usage is in `driver/README.md`.
+- RFC distribution and distro verification belong in `docs/RELEASES.md`; upstream submission
+  and collaboration belong in `CONTRIBUTING.md`.
 - Repeatable operator procedures belong under `docs/` and `scripts/`.
 - `docs/agents/` records routing, safety boundaries, source precedence, and task state. It must not
   become a competing hardware or register reference.
@@ -34,6 +37,6 @@ stale canonical document as part of the same change when it is in scope.
 - Keep paths repository-relative and verify every indexed path exists.
 - Prefer target-independent wording and skill IDs; do not add tool-specific routing keys.
 - Keep temporary logs, generated analysis, and machine-specific state out of this directory.
-- Update `docs/agents/tasks/index.yml` whenever a durable task is created, expanded, moved, or
-  closed.
-
+- Keep open tasks in `docs/agents/tasks/index.yml` and completed tasks in
+  `docs/agents/tasks/closed/index.yml`, reachable through the main index's `archives` entries.
+  Move each record and its index entry together; update references and preserve its ID.
