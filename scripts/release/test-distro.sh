@@ -77,7 +77,13 @@ cmp "$package/alsa/wireplumber/51-quantum2626.lua" \
 cmp "$package/alsa/wireplumber/51-quantum2626.conf" \
     "$work/stage-0.5/usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf"
 bash "$package/host-tools.sh" check
-bash "$package/host-tools.sh" wireplumber
+if [[ -z "$native_dir" ]]; then
+    bash "$package/host-tools.sh" wireplumber
+else
+    # Native packages install both policy formats and do not call the old tar
+    # installer's version probe. Validate the current helper independently.
+    bash /workspace/driver/scripts/host-tools.sh wireplumber
+fi
 
 # These install only into the disposable container; no module is loaded.
 cp -R "$package/module" "/usr/src/quantum-$version"
@@ -88,10 +94,12 @@ depmod -a "$kernel"
 modinfo -k "$kernel" snd-quantum
 dkms remove -m quantum -v "$version" --all
 
-python3 /workspace/scripts/release/validate-audio.py "$package/alsa"
 if [[ -n "$native_dir" ]]; then
     bash /workspace/scripts/release/test-native.sh "$family" "$native_dir" "$upgrade_dir" "$kernel"
+else
+    python3 /workspace/scripts/release/validate-audio.py "$package/alsa"
 fi
 cat /etc/os-release
+dkms --version
 printf 'tested_kernel=%s\npackage_version=%s\n' "$kernel" "$version"
 printf 'PASS: DKMS build/install/remove and staged audio policy; no hardware tested.\n'
