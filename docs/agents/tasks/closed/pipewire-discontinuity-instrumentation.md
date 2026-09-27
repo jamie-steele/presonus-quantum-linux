@@ -31,7 +31,7 @@ driver defaults.
 
 - `scripts/quantum2626_loopback_soak.py` owns the fail-closed analyzer and transport helpers.
 - `docs/LOOPBACK_CONTINUITY_TESTING.md` owns the test and artifact contract.
-- `docs/agents/tasks/release-performance-hardening.md` retains the prior direct-ALSA and PipeWire
+- `docs/agents/tasks/closed/release-performance-hardening.md` retains the prior direct-ALSA and PipeWire
   controls.
 - Immutable five-minute PipeWire evidence under
   `/tmp/quantum2626-loopback-pipewire-post-defaults-calibration-20260818-8` completed at exact
@@ -77,6 +77,23 @@ driver defaults.
   `data-loop*`. The matcher now accepts both exact server naming forms only when owned by the
   same-user `pipewire` process. Offline fixtures reject client-owned and lookalike names, and live
   read-only discovery recovers the host thread without opening either audio direction.
+- **Post-closure rate-selection extension, 2026-08-19:** the desktop baseline later moved to native
+  48 kHz for a listening A/B. The live harness now accepts an explicit `--rate` of 44100 or 48000,
+  passes that rate to both PipeWire or direct-ALSA helpers, and validates both hardware directions
+  against the same selected rate. The default remains 44100 so retained 44.1-kHz commands and
+  immutable event replay behavior do not change. Offline fixtures cover both generated 48-kHz
+  helper command pairs and calculate the two 1 MiB capture-stage margins at both supported rates.
+  The focused rate contract and immutable replay pass; the complete self-test is currently blocked
+  before completion by the host pipe-capacity boundary recorded in TASK-007. This extension does
+  not switch the graph or open audio.
+- **Post-closure PipeWire isolation repair, 2026-08-19:** two repeated host checks permitted kernel
+  pipes only through 256 KiB even with zero active audio streams and closed PCMs. With explicit user
+  approval, PipeWire capture now uses a preallocated, bounded 1 MiB userspace byte ring inside the
+  isolated extractor; direct ALSA keeps its existing kernel-pipe contract. The focused fixture
+  fills the ring exactly, crosses multiple wrap points, preserves every byte, propagates reader
+  failure, and reports its admitted capacity before live helper startup. Three consecutive
+  PipeWire-focused self-tests pass at both supported rate contracts, and immutable replay still
+  classifies all 29 retained captures. No audio stream or live artifact was created.
 
 ## Decisions
 
@@ -90,20 +107,22 @@ driver defaults.
 ## Changes
 
 - `scripts/quantum2626_loopback_soak.py`: use the isolated extractor for both transports; require
-  1 MiB raw and mono capture pipes; record and validate every helper thread and pre-discovered
-  PipeWire server data loop; emit structured ERR transitions; retain terminal instrumentation
-  state in the summary. Final SHA-256:
-  `996bb70f7ff5c05d16b56156275693f7cc097c759a4f28627cc333a8c0445c7c`.
+  1 MiB PipeWire userspace isolation or the existing direct-ALSA kernel pipes; record and validate
+  every helper thread and pre-discovered PipeWire server data loop; emit structured ERR transitions;
+  retain terminal instrumentation state in the summary; accept an explicit live rate of 44100 or
+  48000 while preserving 44100 as the default.
 - `docs/LOOPBACK_CONTINUITY_TESTING.md`: document the new pipeline, artifacts, scheduling contract,
   and interpretation limits.
 - `docs/agents/tasks/index.yml`: register and close TASK-006 while preserving the existing TASK-003
   addition.
-- `docs/agents/tasks/pipewire-discontinuity-instrumentation.md`: record this objective and proof.
+- `docs/agents/tasks/closed/pipewire-discontinuity-instrumentation.md`: record this objective and proof.
 
 ## Validation
 
 - `python3 -m py_compile scripts/quantum2626_loopback_soak.py` — pass.
 - `python3 scripts/quantum2626_loopback_soak.py self-test` — three consecutive terminal passes.
+- `python3 scripts/quantum2626_loopback_soak.py self-test --transport pipewire` after the
+  userspace-ring repair — three consecutive terminal passes.
 - `python3 scripts/quantum2626_loopback_soak.py replay --artifact-dir
   /tmp/quantum2626-loopback-pipewire-post-defaults-calibration-20260818-8` — pass, 29 captures.
 - Existing-artifact parser exercise — pass, four exact roles and 36 transition records.
@@ -120,7 +139,7 @@ driver defaults.
 
 ## Closure Summary
 
-Closed 2026-08-19. The PipeWire capture path is now isolated from analyzer timing by two required
-1 MiB stages, and directional evidence includes exact helper threads, PipeWire server data loops,
-and structured ERR transitions. Offline proof is complete; no live state was touched and no gate
+Closed 2026-08-19. The PipeWire capture path is isolated from analyzer timing by an exact 1 MiB
+stage, and directional evidence includes exact helper threads, PipeWire server data loops, and
+structured ERR transitions. Offline proof is complete; no live state was touched and no gate
 authority was used.

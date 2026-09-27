@@ -5,12 +5,13 @@ Load this guide for edits under `driver/` or for claims about the current kernel
 ## Read First
 
 1. `notes/CURRENT_STATUS.md`
-2. `driver/snd-quantum2626.c`
+2. `driver/upstream.lock` and its verified external source for the default backend;
+   `driver/snd-quantum2626.c` only for the in-house fallback
 3. `notes/REGISTER_GUESSES.md` when changing MMIO behavior
 4. `driver/README.md` for the operator-facing build surface
 5. `docs/LINUX_TESTING.md` only when live testing is in scope
 
-The C source wins when older prose describes the implementation differently. If a change makes a
+The selected backend's C source wins when older prose describes it differently. If a change makes a
 canonical status or usage document stale, update that document in the same slice when practical.
 
 ## Boundaries
@@ -37,3 +38,8 @@ make -C driver
 Compilation requires matching kernel headers. A missing or mismatched host kernel build tree is an
 environment limitation, not a reason to alter driver behavior. Live verification is separately
 routed through `docs/agents/hardware-testing.md`.
+
+Run `make -C driver upstream-sync` explicitly when the RFC cache is absent. Do not edit the
+verified cache as a development tree: collaborate in a separate source checkout and submit
+kernel-path patches following `CONTRIBUTING.md`. Release packaging checks are in
+`docs/RELEASES.md` and do not establish hardware acceptance.

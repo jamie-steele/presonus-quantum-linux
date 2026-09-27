@@ -1,7 +1,34 @@
 # Quantum 2626 Linux Driver — Current Status
 
-**Last updated:** 2026-08-18
-**TL;DR:** Static analysis of the vendor's macOS DriverKit extension recovered the TCI mailbox,
+**Last updated:** 2026-09-27 (repository direction and release integration; no new live test)
+
+## Current Repository Direction
+
+- Nicholas Johnson's [official RFC](https://lore.kernel.org/all/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/)
+  `snd-quantum` is the main/default backend. It remains an RFC, not a claim of mainline merge.
+- [EMATech/quantum](https://github.com/EMATech/quantum) is an unofficial contributor
+  collaboration adaptation, not the official RFC publication channel. Release detection
+  follows Nicholas's official linux-sound submissions through Patchwork/lore, not EMATech commits.
+- This repository owns discovery/research, desktop profiles, test evidence, and experimental
+  source/DKMS releases. The in-house `snd-quantum2626` source remains a research/recovery fallback.
+- Legacy feature and migration task plans are retired in the
+  [closed task index](../docs/agents/tasks/closed/index.yml). Upstream already owns MIDI and
+  other implemented kernel features; this repository has no duplicate implementation backlog.
+  Recorded runtime limitations remain evidence for future concrete investigations, not queued
+  historical test invocations.
+- Static source inspection confirms the original RFC exposes 26 channels across its advertised
+  rates and includes MIDI, mixer/clock controls, and removal handling. Those are implementation
+  claims, not new physical validation. The fallback's 26/18/8 geometry is a separate contract.
+- UCM stays at 48 kHz with 13 stereo playback endpoints and 26 mono capture endpoints. Release
+  packaging supports WirePlumber 0.4/0.5 and update-initramfs/dracut/mkinitcpio.
+- [RELEASES.md](../docs/RELEASES.md) owns distro checks and publication semantics;
+  [TASK-015](../docs/agents/tasks/closed/rfc-release-integration.md) records verification. Scheduled
+  publication requires the workflow on the default branch. No new hardware acceptance follows
+  from source builds or packaging tests; the earlier DMA/discovery failures remain relevant.
+
+## Historical Summary Through 2026-08-21
+
+Static analysis of the vendor's macOS DriverKit extension recovered the TCI mailbox,
 audio page tables, IRQ contract, rate setter, and rate-dependent channel order. The installed Linux
 module reaches the solid-blue ready state and implements native 44.1/48/88.2/96/176.4/192 kHz
 selection with 26/18/8-channel profiles. Direct and ordinary Firefox playback at 44.1 kHz are
@@ -15,10 +42,8 @@ geometry, IRQ cadence, realtime scheduling, and PipeWire counters remain clean. 
 untested `msbits=24` metadata became the leading regression variable. An exact QoS-only candidate is
 now installed and loaded with PipeWire returned to 32 resolution bits; audible acceptance is
 immediately excellent and clean, with the active stream retaining zero graph errors, exact IRQ
-cadence, realtime scheduling, and suppressed deep idle. A later NeuralRack test isolated a distinct
-native-44.1 duplex lifecycle defect: capture-first startup silenced playback, capture teardown
-restored crackling playback, and a complete playback-only close/reopen restored clean audio.
-The refined driver candidate now keeps both DMA buffers stable across one-sided lifecycle changes,
+cadence, realtime scheduling, and suppressed deep idle. The refined driver candidate now keeps both
+DMA buffers stable across one-sided lifecycle changes,
 handles ALSA synchronized starts, and aligns an independent late direction at the next ring wrap.
 Its exact build is installed and loaded, and playback returned at native 44.1 kHz/128/512. Desktop
 recovery is incomplete: 13 sinks returned, but WirePlumber aborted one audio adapter and currently
@@ -59,6 +84,12 @@ S32_LE/128/512 duplex geometry with zero xruns or captured continuity events. Pa
 14.802-second helper demotion, this supports retaining the exact System76 `aplay`/`arecord`
 exceptions as conservative host defaults; it does not establish PipeWire or subjective listening
 acceptance.
+The later upstream switch now has mixed evidence: a 44.1-to-48-kHz discovery
+transition produced DMA/IOMMU faults and command timeouts, while a cold boot
+recovered the complete 13/26 graph and a good user listening interval. The
+active rate was not captured before playback closed, and both installed modules
+still expose the same PCI alias, so neither sustained upstream acceptance nor a
+persistent boot owner is yet proven on the host.
 
 ## Evidence Labels
 
@@ -67,18 +98,107 @@ acceptance.
 - **Implemented, unverified:** present in the Linux driver but not yet confirmed on hardware.
 - **Hypothesis:** still requires static corroboration or a bounded live test.
 
-## Current Host Baseline
+## Driver Backend Status
 
-- **Observed Linux:** PCI function `09:00.0` is `1c67:0104` and is bound to `snd_quantum2626`.
+- **Observed Linux:** all live evidence earlier than the 2026-08-20 upstream
+  activation belongs to the in-house `snd-quantum2626` implementation unless
+  an entry explicitly says otherwise.
+- **Offline validation:** Nicholas Johnson's 2026-08-20 upstream RFC is pinned
+  by URL plus patch/source hashes in `driver/upstream.lock`, synchronized only
+  by the explicit `make -C driver upstream-sync` target into the user's external
+  cache, and builds as the separately named `snd-quantum.ko` module with
+  `make -C driver QUANTUM_DRIVER=upstream W=1`. No upstream driver source is
+  stored in this repository and ordinary builds never access the network.
+  The upstream RFC is the default source build; the in-house
+  `snd-quantum2626.ko` remains selectable with `QUANTUM_DRIVER=inhouse`. At
+  that offline checkpoint the upstream backend had not been installed or
+  exercised; the later activation below is its first hardware evidence. None
+  of the earlier in-house runtime results transfer to it automatically.
+- **Observed Linux, 2026-08-20 19:34 EDT:** the exact upstream RFC artifact
+  SHA-256 `fe1f725a33a2c12fddb0f09ea8e849902fad8d65c5a1900d82278d8f4aebe2da`
+  was installed as `snd-quantum.ko`, the matching UCM selector was installed,
+  and the five user audio units were stopped and restarted once. The upstream
+  `snd_quantum` module then owned PCI `1c67:0104`, registered Quantum2626 as ALSA
+  card 0 on MSI IRQ 213, and settled with both hardware PCMs closed. Module
+  srcversion is `65A6D16B4AFEEDFEEA3CF43`; no new DMA, IOMMU, XRUN, warning,
+  BUG, or oops marker accompanied activation. CPU-latency state is inactive at
+  the closed checkpoint with configured/effective 2 us.
+- **Observed Linux, desktop limitation:** all five PipeWire/WirePlumber units
+  returned active, but WirePlumber exposed only one generic multichannel sink
+  and one generic multichannel source instead of the intended 13 playback and
+  26 capture UCM endpoints. `alsaucm -c hw:Quantum2626 dump text` independently
+  parses the complete installed HiFi profile, while the active PipeWire device
+  reports ACP properties and the restart log contains one aborted audio-adapter
+  activation. This localizes the immediate failure to WirePlumber/UCM profile
+  selection after the swap, not to absent UCM files or failed kernel binding.
+  The later separately approved recovery attempts are recorded below; playback
+  was not started.
+- **Observed Linux, 2026-08-21 13:31 EDT stopped result:** after ordinary gaming
+  accumulated 1,746 errors on the upstream-backed Main sink at native 44.1 kHz,
+  the shared UCM playback and capture slaves were corrected from 44.1 to the
+  documented 48 kHz desktop default and the user restarted PipeWire and
+  WirePlumber. The installed UCM parsed all 13 playback and 26 capture endpoints,
+  but live discovery published none of them. The capture probe storm produced
+  DMA reads to unmapped addresses including zero, repeated DMAR faults, page-table
+  activation timeouts, and `DMA allocation failed: -110`; later playback probes
+  repeatedly timed out setting the sample rate. Both PCMs are closed and the
+  Quantum PCI function remains bound to `snd_quantum`, but the desktop graph is
+  unusable. Stop upstream retries and restore the retained in-house fallback
+  before further listening. This is an upstream kernel-backend failure exposed
+  by desktop discovery, not merely a PipeWire resampling problem. That boot
+  later ended without an orderly shutdown at 13:36:03. The final persistent
+  records are repeated GNOME Shell garbage-collection callback errors rather
+  than a kernel panic, so the full-machine crash is temporally correlated with
+  the earlier DMA faults but is not proven to have been caused by them. A cold
+  reboot reset the device, republished the complete 13/26 graph, and has no new
+  fault-class marker while both PCMs remain closed; `snd_quantum` nevertheless
+  auto-bound again because both installed modules claim the same PCI ID.
+- **Offline validation, 2026-08-21:** repository install semantics now
+  require an explicit upstream or in-house mode. The selected mode stages one
+  stable modprobe policy that blacklists only the alternate PCI alias and a real
+  host install refreshes the target kernel initramfs. This removes the source
+  contract's automatic binding race while retaining both module artifacts, but
+  it is not active-host or reboot proof until separately installed and booted.
+  Both backend `W=1` builds, isolated full install trees, exact selector/UCM
+  comparisons, modprobe dry resolution, and a 13-playback/26-capture UCM parse
+  passed without network or live-device access.
+
+## Kernel Reinstall Checkpoint, 2026-09-09
+
+- **Observed Linux, read-only inspection:** on `7.1.1-76070101-generic`, the rebuilt
+  upstream `snd-quantum.ko` is installed and bound, with ALSA card ID `Quantum2626`.
+  Installed and build artifact SHA-256 both equal
+  `3adfc5b89e57d8a93cd0e7ea58548f35637c771c7fc18e4f408749cc5a5975ed`;
+  loaded srcversion is `65A6D16B4AFEEDFEEA3CF43`.
+- **Observed Linux:** PipeWire, pipewire-pulse, and WirePlumber are active. The
+  Quantum device exists, but its active profile is `off`; only `off` and
+  `pro-audio` are advertised, with no HiFi profile or Quantum sink/source.
+  The installed upstream UCM selector exists and both shared slave rates are
+  48000. Both hardware PCMs are closed at inspection.
+- **Observed Linux:** this boot records page-table activation timeouts and
+  `DMA allocation failed: -110` at 20:34:59 EDT, followed by Quantum DMA-write
+  IOMMU faults and further timeouts at 20:37:45 EDT. Installation and binding
+  succeeded; desktop discovery is unusable. These symptoms resemble the earlier
+  upstream failure; a new-kernel regression is not established. A separate
+  initial return-thunk warning has an NVIDIA initialization stack, not a Quantum
+  stack. No service restart, module action, profile switch, or PCM test was
+  performed during this inspection. Recovery remains unverified.
+
+## Historical Host Baseline, 2026-08-21
+
+- **Observed Linux:** PCI function `09:00.0` is `1c67:0104` and is bound to upstream
+  `snd_quantum` after the later cold boot.
 - **Observed Linux:** the running kernel is `7.0.11-76070011-generic` on x86_64.
 - **Observed Linux:** ALSA card `P2626` exposes playback and capture device 0 on IRQ 213.
-- **Observed Linux:** the installed and loaded module SHA-256 is
-  `d54f2bf411430c5ed350b5999d07795e9d7de6aa3801332c9e0d97152fa9b45e`, srcversion
-  `D1D19FA61C85B05A46E2A01`.
-- **Observed Linux:** all five user audio units report active and the PipeWire registry responds.
-  After a longer settle than the activation controller allowed, the active-page candidate publishes
-  all 13 Quantum sinks and 26 Quantum sources. Playback runs at native 44.1 kHz/128/512; capture is
-  closed.
+- **Observed Linux:** the installed and loaded upstream module SHA-256 is
+  `fe1f725a33a2c12fddb0f09ea8e849902fad8d65c5a1900d82278d8f4aebe2da`.
+  Installed in-house fallback SHA-256 is
+  `d54f2bf411430c5ed350b5999d07795e9d7de6aa3801332c9e0d97152fa9b45e`.
+- **Observed Linux:** after the cold boot, the complete 13-output/26-input UCM
+  graph returned, both hardware PCMs were closed at the recorded checkpoint,
+  the fresh Main sink had zero errors when observed, and the user reported good
+  playback. The active rate was not captured before playback closed; this is a
+  good interval, not sustained upstream acceptance.
 - **Observed Linux:** Secure Boot is disabled, so an unsigned local test module is loadable after
   local sudo authentication.
 - **Observed Linux:** a later read-only desktop inspection confirmed the active Main endpoint was
@@ -897,18 +1017,6 @@ acceptance.
   bounded, both PCM states returned to `closed`, and no xrun or timeout was reported. The exact
   installed and loaded module hash is the offline-validated hash above. WirePlumber is active and
   Main was restored to 31% volume.
-- **Observed Linux and user-observed hardware:** native-44.1 NeuralRack routing exposed a later
-  capture-first duplex failure that the proven 48-kHz test did not cover. The driver started
-  capture-only `0x2`, rebuilt exact 128/512 resources for joint `0x3`, and resumed only the
-  previously running `0x2` mask; source inspection shows playback then late-joins the active engine
-  without a hardware restart. Capture, NeuralRack, Main, and Firefox all reported RUNNING with zero
-  PipeWire errors and no fault log, but both processed guitar and Firefox playback were inaudible.
-  Closing NeuralRack rebuilt playback-only `0x1` and restored Firefox with crackle. Geometry stayed
-  44.1 kHz, 26-channel S32_LE and 128/512, PipeWire data loops stayed `SCHED_RR` priority 20, and
-  frozen CPU0 C2/C3 counters proved the 2-us driver QoS remained active. A ten-second user pause
-  then forced a complete playback-only close/reopen and restored clean audio. Treat native-44.1
-  live duplex as failed until pointer/period phase continuity across the second-direction late join
-  is corrected and separately validated.
 - **Implemented, unverified:** the refined duplex lifecycle candidate preallocates fixed playback
   and capture buffers, programs their stable DMA addresses together, and leaves the joint tables
   intact when only one ALSA direction changes. It now follows ALSA's established shared-transport
@@ -1078,76 +1186,15 @@ acceptance.
   channel, the intended `quantum2626_mono_in:P2626,0,0` ALSA path, and normal suspended state while
   unlinked. Reclassify the earlier 13/0 result as a bounded startup checkpoint rather than the final
   stable graph. Capture remains closed; this proves publication, not native-44.1 duplex audio.
-- **Observed Linux NeuralRack routing correction, 2026-08-16:** the locally built standalone
-  NeuralRack launched at 44.1 kHz with a 256-sample JACK buffer. Its ports are typed
-  `neuralrack:in` for MIDI, `neuralrack:in_0` for mono audio, and `out_0`/`out_1` for stereo audio.
-  An incorrect audio-source link to the MIDI port was accepted by PipeWire; after the audio input
-  was also linked, NeuralRack emitted an xrun and segfaulted in its own `pw-data-loop`. The Quantum
-  hardware had reached exact joint 44.1 kHz/26-channel S32_LE/128/512 geometry and no Quantum,
-  DMAR, or IOMMU fault appeared. After the client exited, its links disappeared, capture closed,
-  and Firefox playback remained linked at the same geometry. This malformed-route crash is a
-  userspace NeuralRack result, not native-44.1 duplex validation. A retry must connect Input 1 only
-  to `neuralrack:in_0`, with `out_0`/`out_1` connected to Main left/right.
-- **Observed Linux clean NeuralRack routing retry, 2026-08-16:** a fresh standalone client remained
-  running at 44.1 kHz/256 JACK frames with exactly three audio links: Input 1 `capture_MONO` to
-  `neuralrack:in_0`, `out_0` to Main left, and `out_1` to Main right. Both ALSA directions are open
-  at matching 44.1 kHz/26-channel S32_LE/128/512 geometry. NeuralRack printed one connection-time
-  xrun, but its process and links remained present and the bounded kernel log contained no Quantum,
-  DMAR, IOMMU, timeout, fault, BUG, or oops marker. Audible guitar validation is pending.
-- **User-observed and offline-classified NeuralRack model-enable crash, 2026-08-16:** the user heard
-  the correctly routed live input, proving Input 1 -> NeuralRack -> Main audio flow, then NeuralRack
-  crashed when its saved JC-40 model was enabled. A second userspace segfault occurred at the same
-  executable offset `0x3904e` on a different CPU. An exact unstripped relink maps that offset to the
-  `memcpy` immediately after model processing in `NeuralModelLoader::compute()`. That callback uses
-  variable-length stack arrays for its model and resampling buffers. The saved model is
-  `JC40_414_HIGH_DIST.nam`, a 48-kHz NAM 0.7 `SlimmableContainer`; the local loader supports that
-  format. After the app exited, its links disappeared, capture closed, Firefox playback remained at
-  exact native 44.1 kHz/26-channel S32_LE/128/512, and no Quantum, DMAR, or IOMMU fault appeared.
-  Classify this as a NeuralRack realtime stack/model-processing failure, not a driver or routing
-  failure. The narrow app-side fix candidate is to replace the realtime variable-length arrays with
-  buffers allocated outside the process callback; do not retry or alter the stable audio stack as
-  part of this diagnosis.
-- **Offline NeuralRack realtime-buffer fix built, 2026-08-16:** a separate temporary build now
-  replaces both variable-length arrays in `NeuralModelLoader::compute()` with member buffers sized
-  only from non-realtime setup paths. It also sizes the model-processing capacity for the 44.1-to-
-  48-kHz resampling expansion and returns dry audio if a callback exceeds the prepared capacity.
-  The standalone build completed with no new diagnostic, links to PipeWire's JACK library, and is
-  hash `a26a3ed9...dee8`; disassembly shows a fixed 24-byte `compute()` stack frame and no allocator
-  call in that callback. This is offline integrity evidence only. The binary remains under
-  `/tmp/neuralrack-debug.gY9Hq1/bin/Neuralrack`; no app launch, link, driver change, service restart,
-  or live model processing occurred after the build.
-- **User-observed fixed-build NeuralRack runtime result, 2026-08-16:** the fixed temporary binary
-  launched and survived enabling the saved JC-40 model, proving the prior repeatable userspace
-  segfault is removed. The intended Input 1 -> `in_0` and stereo Main links remained present, and
-  both ALSA directions stayed exact 44.1 kHz/26-channel S32_LE/128/512. The user heard processed
-  audio but reported many pops. During an eight-sample live snapshot, Main used only 0.02--0.03 of
-  its deadline and Input 1 effectively zero; their accumulated PipeWire error totals remained fixed,
-  with no new kernel or userspace crash marker. An offline exact resampler probe identifies an
-  app-side discontinuity: for 256 input frames the existing 44.1 -> 48 -> 44.1 chain returns 253,
-  255, 256, or 257 frames, while `NeuralModelLoader::compute()` ignores the return count and always
-  copies 256. This leaves stale tails on short blocks and discards samples on long blocks, matching
-  the frequent pops. Preserve the driver and live geometry; fix output-frame accumulation in the
-  NeuralRack resampling path before another model test.
-- **Offline NeuralRack resampling-continuity fix built, 2026-08-16:** after the user closed the live
-  app, the separate candidate gained a preallocated circular output queue with an eight-frame
-  priming cushion (about 0.18 ms at 44.1 kHz). Every variable-length resampler result is now retained
-  and exactly one JACK block is consumed per callback; no allocation or sample discard occurs in
-  `compute()`. A one-million-block exact 44.1 -> 48 -> 44.1 probe bounded cumulative production at
-  -3..0 frames, and a 10,000-block 1-kHz continuity probe reduced the old path's maximum adjacent
-  step from 0.449398 to 0.150643 with five queued frames remaining. The standalone build succeeds at
-  hash `4c2913b3...321f`; disassembly shows one fixed 40-byte callback stack frame and no allocator
-  call. This is offline evidence only. The updated binary remains
-  `/tmp/neuralrack-debug.gY9Hq1/bin/Neuralrack`; it has not been launched or linked, and the Quantum
-  driver, PipeWire configuration, services, and stable geometry were not changed.
 - **User-observed overnight playback recurrence, 2026-08-17:** after the host and audio services
   remained up overnight, ordinary Firefox playback again had occasional relatively mild pops.
   PipeWire, PipeWire Pulse, and WirePlumber have remained active since 17:52 on August 16 with zero
-  systemd restarts. NeuralRack is absent, capture is closed, and playback remains exact native
+  systemd restarts. Capture is closed, and playback remains exact native
   44.1 kHz/26-channel S32_LE/128/512. The active Main node still runs at quantum 256 with playback
   headroom 256; the metadata `clock.quantum=1024` is an unforced global default, not its active
   hardware quantum. At 20:22 PipeWire logged one `spa.audioconvert` `out of buffers` event with one
   suppressed repetition. Main now has 29 accumulated errors and the active Firefox stream one,
-  compared with 19 and zero around the prior NeuralRack checkpoint. Both totals stayed fixed across
+  compared with 19 and zero around the prior checkpoint. Both totals stayed fixed across
   a subsequent 30-second sample; Main used at most 0.03 of its deadline and Firefox effectively
   zero. The kernel has no Quantum xrun, timeout, DMA/IOMMU fault, BUG, or oops. IRQ 213 advanced
   exactly 1,040 times in about three seconds and ALSA `hw_ptr` advanced 132,695 frames, matching
@@ -1606,6 +1653,24 @@ acceptance.
   `Line Input 5` PipeWire capture produced a 48 kHz/S32_LE mono WAV with 94,316 sample changes in
   the inspected 96,000-sample window. It binds only hardware channel 5 (zero-based 4). Main
   remained at 31%, active playback was preserved, and no kernel fault marker appeared.
+- **Observed upstream RFC activation boundary, 2026-08-20:** exact upstream module
+  `fe1f725a...e2da`, srcversion `65A6D16B4AFEEDFEEA3CF43`, was loaded and owned PCI `1c67:0104`;
+  both Quantum PCMs are closed and bounded logs contain no kernel fault class. The installed new
+  UCM selector opens exactly and PipeWire's standalone ACP probe enumerates HiFi with 13 playback
+  plus 26 capture devices. After the user-approved desktop recovery, the corrected discovery-time
+  WirePlumber rule (`4fae5455...5486`) visibly sets `api.alsa.use-ucm=true`, but WirePlumber 0.4
+  still emits `Object activation aborted: proxy destroyed` and falls back to one generic
+  26-channel sink/source pair. This localizes the unresolved issue to our WirePlumber/UCM adapter
+  integration, not to a missing UCM install and not yet to upstream kernel transport. HDMI remains
+  the active default sink, all user audio services are active, and no playback was initiated.
+  That checkpoint stopped live retries and led to the separately approved rollback recorded next.
+- **Observed in-house restoration, 2026-08-20:** after the user requested the working interface,
+  three task-owned standalone ACP diagnostics were found holding controlC0 and were terminated.
+  The hash-pinned rollback then completed: exact in-house module `d54f2bf4...b45e`, srcversion
+  `D1D19FA61C85B05A46E2A01`, owns PCI `1c67:0104`; ALSA card 0 is `P2626` on IRQ 213; all five
+  user audio units are active; Main is selected; and the full 13-output/26-input UCM graph is
+  restored. Both hardware PCMs were closed and the bounded rollback log contained no fresh
+  fault-class marker. Preserve this working runtime; no upstream listening A/B occurred.
 
 ## What Is Proven Today
 
@@ -1628,17 +1693,12 @@ acceptance.
 
 ## Immediate Next Steps
 
-1. Apply a known signal to each analog input and connect a clock-compatible S/PDIF/ADAT sender to
+1. Keep live upstream retries stopped. Install one explicit persistent backend
+   selection only through a separately authorized host-change boundary, then
+   require a later cold-boot read-back before claiming the PCI-alias race is
+   resolved on the machine.
+2. Apply a known signal to each analog input and connect a clock-compatible S/PDIF/ADAT sender to
    validate physical source identity, digital lock, and every advertised input channel.
-2. With a clock-compatible receiver connected, validate S/PDIF and ADAT output pairs individually
+3. With a clock-compatible receiver connected, validate S/PDIF and ADAT output pairs individually
    and then validate concurrent `dshare` endpoints. Do not infer physical digital lock from a
    parsed profile.
-3. Preserve native 44.1 kHz, 128/512 hardware geometry, playback `slowptr true`, 256-frame
-   playback headroom, and the proven scheduler policy. Exact active-page module
-   `d54f2bf4...b45e`, srcversion `D1D19FA61C85B05A46E2A01`, is installed and loaded; its delayed
-   settled graph is 13/26 with Input 1 correctly published. The next live boundary is launching
-   only the separately built fixed NeuralRack binary, routing Input 1 `capture_MONO` to its audio
-   `in_0`, then `out_0`/`out_1` to Main left/right, and enabling the saved JC-40 model without a
-   restart or configuration change. Do not route audio to NeuralRack's MIDI-only `in` port.
-   Do not combine it with IRQ affinity, geometry, higher-rate, external-clock, hot-removal, or
-   playback-default changes.

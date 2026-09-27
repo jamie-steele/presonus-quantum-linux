@@ -2,7 +2,14 @@
 
 ## Status
 
-Backlog
+Closed; superseded by Nicholas Johnson's upstream RFC on 2026-09-27.
+
+The verified source pinned by `driver/upstream.lock` already implements ALSA
+RawMIDI input/output in `quantum_midi.c`, and `quantum_main.c` registers it through
+`quantum_midi_new()`. The main driver does not need the MIDI implementation proposed
+here. The original in-house plan below is retained as history, not work to resume.
+This closure records adoption of existing upstream functionality, not a new physical
+MIDI test or a claim that the in-house fallback gained MIDI support.
 
 ## Objective
 
@@ -34,7 +41,7 @@ prove byte-correct bidirectional operation without regressing the live-proven PC
 
 - `driver/snd-quantum2626.c` currently registers PCM playback/capture but contains no RawMIDI
   implementation.
-- `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md` owns the recovered vendor TCI mailbox model
+- `docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md` owns the recovered vendor TCI mailbox model
   and is the first reference if MIDI is multiplexed through that control transport.
 - `notes/CURRENT_STATUS.md` owns the current live hardware and audio baseline.
 - `docs/agents/reverse-engineering.md` and `docs/agents/hardware-testing.md` govern vendor analysis
@@ -102,9 +109,12 @@ prove byte-correct bidirectional operation without regressing the live-proven PC
 
 ## Remaining Work
 
-- Begin only when the user promotes TASK-003 from backlog and separately approves the first live
-  trace or hardware boundary.
+- None for this implementation objective. Report a concrete upstream MIDI defect
+  or test result through the contribution workflow rather than reviving the
+  in-house reverse-engineering and implementation plan.
 
 ## Closure Summary
 
-Open backlog item; implementation and live validation have not started.
+Closed as superseded on 2026-09-27. Upstream provides the ALSA RawMIDI feature;
+no duplicate driver implementation is planned here. The historical GitHub issue
+reference above is preserved; this local cleanup did not change the remote issue.
