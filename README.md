@@ -59,8 +59,12 @@ derivatives and other kernels require their own validation. There is no universa
 precompiled `.ko`: DKMS builds for the installed kernel and rebuilds on upgrades.
 
 See [installation, distro dependencies, and release operation](docs/RELEASES.md).
-The workflow must be on the GitHub default branch with Actions enabled before
-scheduled publication operates. No release is implied merely by adding these files.
+Native packaging adds an Ubuntu/Debian `quantum-dkms` DEB and Fedora/openSUSE RPMs
+after install, upgrade, and removal checks. Use your package manager to install the
+downloaded file; matching kernel headers are required. An opt-in signed APT feed
+is configured for ongoing updates. See the guide for the production URL, signing-key
+verification, deployment status, and migration from
+the tar installer. Arch retains the source/DKMS installation path.
 
 ## Build from this repository
 

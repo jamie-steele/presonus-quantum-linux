@@ -3,6 +3,15 @@ area: closed-tasks
 description: Completed and superseded Quantum2626 task records retained as historical evidence.
 
 tasks:
+  - id: TASK-016
+    title: Native packages and signed APT distribution
+    path: docs/agents/tasks/closed/native-package-distribution.md
+    summary: Locally verified DEB/RPM lifecycle and signed APT feed; hosted activation requires merge, signing key, and Pages setup.
+    status: closed
+    resolution: completed
+    load_when:
+      - changing native package lifecycle, package upgrades, or signed APT publication
+
   - id: TASK-001
     title: TCI mailbox recovery from macOS traces
     path: docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md

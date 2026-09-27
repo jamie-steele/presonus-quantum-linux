@@ -5,6 +5,8 @@ set -Eeuo pipefail
 family=${1:?distro family required}
 bundle_dir=${2:?bundle directory required}
 evidence_dir=${3:?evidence directory required}
+native_dir=${4:-}
+upgrade_dir=${5:-}
 [[ -f /.dockerenv || -f /run/.containerenv ]] || {
     echo 'This test installs packages and must run inside a disposable container.' >&2
     exit 1
@@ -87,6 +89,9 @@ modinfo -k "$kernel" snd-quantum
 dkms remove -m quantum -v "$version" --all
 
 python3 /workspace/scripts/release/validate-audio.py "$package/alsa"
+if [[ -n "$native_dir" ]]; then
+    bash /workspace/scripts/release/test-native.sh "$family" "$native_dir" "$upgrade_dir" "$kernel"
+fi
 cat /etc/os-release
 printf 'tested_kernel=%s\npackage_version=%s\n' "$kernel" "$version"
 printf 'PASS: DKMS build/install/remove and staged audio policy; no hardware tested.\n'
