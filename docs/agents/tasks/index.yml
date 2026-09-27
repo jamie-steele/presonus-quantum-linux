@@ -1,37 +1,33 @@
 schema_version: 1
 area: tasks
-description: Durable task registry for substantial Quantum2626 work.
+description: Open Quantum2626 tasks and routing to indexed task history.
 
 task_system:
   guide: docs/agents/tasks/README.md
   template: docs/agents/tasks/task-template.md
 
-tasks:
-  - id: TASK-001
-    title: TCI mailbox recovery from macOS traces
-    path: docs/agents/tasks/tci-mailbox-macos-trace-pivot.md
-    summary: Replace speculative Windows-register guessing with an evidence-backed TCI mailbox and Linux-native audio path derived from macOS behavior.
-    status: closed
-    load_when:
-      - investigating device initialization, command transport, clocking, DMA, or interrupts
-      - analyzing macOS DEXT behavior or m1n1 MMIO traces
-      - replacing the current experimental register-write path
-      - planning ALSA, PipeWire, JACK, latency, multichannel, or hot-removal validation
+# Legacy implementation and migration work is completed or superseded by upstream.
+# Known limitations remain in notes/CURRENT_STATUS.md; they are not automatic tasks.
+tasks: []
 
-  - id: TASK-002
-    title: Release performance hardening
-    path: docs/agents/tasks/release-performance-hardening.md
-    summary: Measure and improve desktop stability, startup behavior, latency, and shared duplex performance before release claims.
-    status: active
+archives:
+  - id: closed-tasks
+    title: Closed task history
+    path: docs/agents/tasks/closed/index.yml
+    summary: Completed research and integration evidence plus legacy feature and experiment plans superseded by upstream.
+    status: historical
     load_when:
-      - measuring latency, xruns, CPU load, IRQ cadence, or desktop audio stability
-      - tuning ALSA UCM, PipeWire, WirePlumber, dshare, or dsnoop performance
-      - investigating startup artifacts or playback disruption during capture transitions
-      - preparing performance or low-latency release claims
+      - looking up a closed task ID or prior implementation and validation evidence
+      - checking earlier decisions before starting overlapping work
+      - assigning the next task ID across open and closed tasks
 
 maintenance:
-  - Search this index and existing task records before creating overlapping work.
+  - Search this index and the closed archive index before creating overlapping work or assigning an ID.
   - Start a focused task as one Markdown file under docs/agents/tasks/.
   - Migrate a task to a same-named folder with its own index.yml only when it needs branches.
   - A top-level task entry path may point to either the single Markdown record or the nested index.
-  - Keep closed tasks indexed as historical evidence; never silently reuse a closed task ID.
+  - Move closed records and their task entries into docs/agents/tasks/closed/ and its index.yml.
+  - Keep each task indexed exactly once; update references when moving or reopening a record.
+  - Preserve closed evidence and task IDs; never silently reuse an ID.
+  - Check the pinned upstream implementation before opening a feature task; do not duplicate upstream functionality.
+  - Create validation or integration tasks for concrete current objectives, not every untested feature or retired experiment.

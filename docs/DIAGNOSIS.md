@@ -1,5 +1,10 @@
 # Diagnosis Plan — Quantum 2626 on Linux
 
+Historical discovery plan. For the current default `snd-quantum` RFC backend,
+start with [LINUX_TESTING.md](LINUX_TESTING.md) and
+[NO_SOUND_DEBUG.md](NO_SOUND_DEBUG.md). Preserve this plan as research context;
+its earlier no-driver assumptions are not current installation status.
+
 Diagnose first on Linux (path of least resistance), then profile on Windows 11 only if needed.
 
 ---

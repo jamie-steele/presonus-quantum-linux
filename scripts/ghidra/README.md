@@ -58,7 +58,7 @@ analyzeHeadless <project_path> <project_name> -process pae_quantum.sys -script f
 
 **Use for Linux:** Treat the ordered list as corroborating static-analysis evidence. Do not paste
 unknown writes into the driver or probe them live without reconciling them with the TCI mailbox
-contract in `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md`.
+contract in `docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md`.
 
 ### 5. `ExportNamedFunctions.java`
 
@@ -136,7 +136,7 @@ $projectName = "Quantum2626_Driver"
 ### Option 4: Run All Scripts
 
 ```powershell
-cd C:\source\quantum\.git\presonus-quantum2626-linux\scripts\ghidra
+cd C:\source\quantum\.git\presonus-quantum-linux\scripts\ghidra
 .\run_all_analysis.ps1
 ```
 

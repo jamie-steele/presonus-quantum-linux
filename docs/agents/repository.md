@@ -1,13 +1,20 @@
 # Repository Map And Source Precedence
 
-Quantum2626 develops an out-of-tree Linux ALSA PCI driver for the PreSonus Quantum 2626. The
-primary known device is a Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
+PreSonus Quantum Linux owns discovery, research, desktop integration, and experimental releases.
+The default out-of-tree backend is Nicholas Johnson's upstream RFC `snd-quantum`, enabled only
+for Quantum 2626, a Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
+
+The public support claims live in `README.md`. Check the selected backend's PCI table and
+`notes/CURRENT_STATUS.md` for what is enabled and proven. In-house evidence is not RFC evidence.
 
 ## Source Precedence
 
 | Path | Owns |
 | --- | --- |
-| `driver/snd-quantum2626.c` | Actual driver implementation and module parameters. |
+| `driver/upstream.lock` | Default RFC provenance; verified source is in the external cache. |
+| `driver/snd-quantum2626.c` | In-house research fallback and its module parameters only. |
+| `CONTRIBUTING.md` | Nicholas's RFC, EMATech collaboration, kernel and UCM submission. |
+| `docs/RELEASES.md` | Experimental source/DKMS releases and distro verification. |
 | `notes/CURRENT_STATUS.md` | Latest consolidated experimental status and known blockers. |
 | `notes/REGISTER_GUESSES.md` | Register hypotheses, confidence, and supporting observations. |
 | `notes/GHIDRA_FINDINGS_SUMMARY.md` | Consolidated static-analysis findings. |
@@ -31,7 +38,9 @@ primary known device is a Thunderbolt 3 interface exposed as PCI device `1c67:01
 
 ## Current State
 
-As of the consolidated status dated 2026-08-15 in `notes/CURRENT_STATUS.md`:
+The following is historical in-house evidence from the 2026-08-15 checkpoint,
+not current RFC acceptance. Read the later backend and reinstall checkpoints in
+`notes/CURRENT_STATUS.md` before using it:
 
 - The module performs a bounded TCI mailbox startup and read-only readiness handshake for the
   verified `1c67:0104` device.
