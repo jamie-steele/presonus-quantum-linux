@@ -74,15 +74,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - family: ubuntu
+          - id: ubuntu-22.04
+            family: ubuntu
+            image: ubuntu:22.04
+          - id: ubuntu-24.04
+            family: ubuntu
             image: ubuntu:24.04
-          - family: debian
+          - id: debian-12
+            family: debian
+            image: debian:12
+          - id: debian-13
+            family: debian
             image: debian:13
-          - family: fedora
+          - id: fedora
+            family: fedora
             image: fedora:43
-          - family: opensuse
+          - id: opensuse
+            family: opensuse
             image: opensuse/tumbleweed:latest
-          - family: arch
+          - id: arch
+            family: arch
             image: archlinux:latest
     timeout-minutes: 30
     steps:
@@ -97,17 +108,19 @@ jobs:
         env:
           FAMILY: ${{ matrix.family }}
           IMAGE: ${{ matrix.image }}
+          TEST_ID: ${{ matrix.id }}
         run: |
           mkdir evidence
           docker pull "$IMAGE"
-          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' > "evidence/$FAMILY-image.json"
+          mkdir -p "evidence/$TEST_ID"
+          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' > "evidence/$TEST_ID/image.json"
           docker run --rm --cap-drop=ALL --cap-add=CHOWN --cap-add=DAC_OVERRIDE --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID \
             -v "$PWD:/workspace:ro" -v "$PWD/evidence:/evidence" \
-            "$IMAGE" bash /workspace/scripts/release/test-distro.sh "$FAMILY" /workspace/bundle /evidence
+            "$IMAGE" bash /workspace/scripts/release/test-distro.sh "$FAMILY" /workspace/bundle "/evidence/$TEST_ID"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: evidence-${{ matrix.family }}
+          name: evidence-${{ matrix.id }}
           path: evidence/
 
   publish:

@@ -10,6 +10,27 @@ TOOL = ROOT / "driver/scripts/host-tools.sh"
 
 
 class HostToolsTests(unittest.TestCase):
+    def test_wireplumber_legacy_debian_package_detection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            wireplumber = directory / "wireplumber"
+            wireplumber.write_text('#!/bin/bash\nexit 64\n')
+            wireplumber.chmod(0o755)
+            query = directory / "dpkg-query"
+            for version, expected in (("0.4.8-4", "0.4"), ("1:0.5.8-1", "0.5"),
+                                      ("1.0.0-1", None)):
+                with self.subTest(version=version):
+                    query.write_text(f'#!/bin/bash\nprintf "%s\\n" "{version}"\n')
+                    query.chmod(0o755)
+                    environment = dict(os.environ, PATH=temporary, WIREPLUMBER_SERIES="auto")
+                    result = subprocess.run(["/bin/bash", str(TOOL), "wireplumber"],
+                                            env=environment, text=True, capture_output=True)
+                    if expected:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(result.stdout.strip(), expected)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+
     def test_initramfs_refresh_uses_each_tools_native_arguments(self):
         expected = {
             "update-initramfs": "-u -k test-kernel",
