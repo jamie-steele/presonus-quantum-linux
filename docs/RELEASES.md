@@ -73,8 +73,8 @@ chosen fallback policy if needed.
 
 The configured production endpoint is
 [jamie-steele.github.io/presonus-quantum-linux](https://jamie-steele.github.io/presonus-quantum-linux/).
-A local `.deb` installation alone does not subscribe to new releases. The files
-below become available after the first successful signed-repository deployment.
+A local `.deb` installation alone does not subscribe to new releases. The feed
+was deployed and verified from a fresh Ubuntu container on **2026-09-27**.
 
 The dedicated signing key expires on **2027-09-27**. Its full fingerprint is:
 
@@ -265,8 +265,13 @@ Local container verification on 2026-09-27 passed for all five targets with the
 original RFC. The exact kernel versions and evidence limits are recorded in
 [TASK-015](https://github.com/jamie-steele/presonus-quantum2626-linux/blob/HEAD/docs/agents/tasks/closed/rfc-release-integration.md).
 The first hosted release, `rfc-20260820.rfc1.s1148921`, subsequently published
-successfully. Native package attachment and signed APT deployment are separate
-activation steps described above.
+successfully. Native DEB/RPM assets were subsequently attached by
+[run 36344718365](https://github.com/jamie-steele/presonus-quantum-linux/actions/runs/36344718365).
+[Run 36344954793](https://github.com/jamie-steele/presonus-quantum-linux/actions/runs/36344954793)
+signed and deployed the production APT feed. A fresh Ubuntu container then verified
+the pinned production key, HTTPS `apt update`, dependency resolution, and package
+download without installing or loading the driver. The downloaded DEB SHA-256 was
+`1c3c56cb998226f5f41e08e7da9dff016474b37a4d51a448348897472fbc97cc`.
 
 The matrix proves source and DKMS compatibility with the recorded packaged kernels
 and validates staged integration. It does not prove boot, initramfs inclusion,

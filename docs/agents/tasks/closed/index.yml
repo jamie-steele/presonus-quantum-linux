@@ -6,7 +6,7 @@ tasks:
   - id: TASK-016
     title: Native packages and signed APT distribution
     path: docs/agents/tasks/closed/native-package-distribution.md
-    summary: Locally verified DEB/RPM lifecycle and signed APT feed; hosted activation requires merge, signing key, and Pages setup.
+    summary: Verified DEB/RPM lifecycle, published native assets, and activated a signed APT feed with a pinned-key HTTPS client check.
     status: closed
     resolution: completed
     load_when:
