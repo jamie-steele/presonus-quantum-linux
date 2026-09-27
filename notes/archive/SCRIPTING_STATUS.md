@@ -1,7 +1,7 @@
 # Pure Scripting Status - Format Register Analysis
 
 **Date:** 2026-02-03
-**Status:** Historical; superseded by `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md`
+**Status:** Historical; superseded by `docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md`
 
 This record describes an earlier Windows-first experiment. The broken alternative PyGhidra
 launchers and their failure logs were removed during repository cleanup on 2026-08-15. Use

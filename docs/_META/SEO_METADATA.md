@@ -16,19 +16,20 @@ hardware's maximum specification as implemented Linux support.
 
 ## Accuracy Boundaries
 
-- State that playback and capture work on tested hardware.
+- Attribute hardware results to their exact backend; in-house playback/capture proof
+  does not establish sustained RFC acceptance.
 - State that full Quantum family support is a goal, while the Quantum 2626 is
   currently the only enabled and hardware-tested model.
 - Do not imply that the Thunderbolt driver supports the USB-C Quantum ES or HD
   models; those models require separate transport investigation.
-- Describe the currently supported Linux contract as fixed 48 kHz, 26-channel,
-  S32_LE duplex audio.
+- Describe the desktop profile as fixed 48 kHz, 26-channel S32_LE; kernel capabilities
+  are separate and backend-specific.
 - Do not advertise 96 or 192 kHz Linux support until sample-rate switching is
   implemented and live-proven.
 - Do not claim a sub-1 ms Linux round-trip latency result without a repeatable
   measurement.
-- Describe the macOS DriverKit extension as the primary source for the working
-  TCI, DMA, IRQ, and channel-layout implementation.
+- Credit Nicholas Johnson for the main upstream RFC. Describe local protocol research
+  separately; EMATech is an unofficial collaboration adaptation, not the RFC publisher.
 - Keep limitations visible: physical S/PDIF/ADAT routing, mixer controls, MIDI,
   high-rate profiles, and hot removal still need work.
 

@@ -1,139 +1,116 @@
 # PreSonus Quantum Linux
 
-Experimental Linux audio support for the PreSonus Quantum family. The current
-out-of-tree ALSA PCI driver targets the Quantum 2626 Thunderbolt interface
-(`1c67:0104`) and is based on static protocol recovery from the macOS DriverKit
-extension plus bounded tests on owned hardware.
+Discovery, research, desktop audio integration, and experimental releases for
+PreSonus Quantum Thunderbolt interfaces. **Nicholas Johnson's upstream RFC
+driver, `snd-quantum`, is now the main driver and default build backend.**
+The earlier in-house `snd-quantum2626` driver remains an explicit research and
+recovery fallback.
 
-The long-term goal is support for the full Quantum family. That is a roadmap,
-not a claim that every model works today: the Quantum 2626 is presently the
-only enabled and hardware-tested device.
+"Upstream RFC" means a proposal submitted for Linux kernel review; it does not
+mean the driver has been merged into mainline Linux. This independent project
+is not affiliated with PreSonus or Fender.
 
-Project home: <https://github.com/jamie-steele/presonus-quantum-linux>
+## Driver and collaboration
 
-## Quantum family support
+- Nicholas Johnson authored the [original RFC patch](https://lore.kernel.org/all/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/)
+  and its [cover letter](https://lore.kernel.org/all/20260820083646.11383-1-nicholas.johnson-opensource@outlook.com.au/).
+- [EMATech/quantum](https://github.com/EMATech/quantum) is an **unofficial contributor
+  collaboration repository**, with an editable, out-of-tree adaptation of the RFC.
+  It is not the official RFC or its publication channel. Its commits do not trigger
+  our releases; we monitor the official linux-sound submission through Patchwork/lore.
+- This repository retains protocol discovery, hardware findings, test tools,
+  distro release integration, and ALSA UCM/WirePlumber profiles. Future UCM
+  contributions belong in `alsa-ucm-conf`, with separate validation and submission.
+- [Contributing](CONTRIBUTING.md) explains RFC review replies, kernel patch
+  submission, collaboration-tree changes, and ALSA profile contributions.
 
-Legend: ✅ confirmed on physical hardware · 🧪 experimental/in progress ·
-❌ not currently supported · 🎯 planned
+## Status and support
 
-| Model | Connection | Device support | Playback | Capture | Desktop integration | Current state |
-| --- | --- | :---: | :---: | :---: | :---: | --- |
-| Quantum 2626 | Thunderbolt 3 / PCIe | ✅ | ✅ | ✅ | ✅ | 🧪 Active development; usable, but stability and performance work continues |
-| Quantum | Thunderbolt 2 / PCIe | ❌ | ❌ | ❌ | ❌ | 🎯 Roadmap; needs model-specific hardware and protocol validation |
-| Quantum 2 | Thunderbolt 2 / PCIe | ❌ | ❌ | ❌ | ❌ | 🎯 Roadmap; static family identity only, with no Linux hardware proof yet |
-| Quantum 4848 | Thunderbolt 2 / PCIe | ❌ | ❌ | ❌ | ❌ | 🎯 Roadmap; static family identity only, with no Linux hardware proof yet |
-| Quantum ES 2 | USB-C | ❌ | ❌ | ❌ | ❌ | 🎯 Long-term roadmap; different USB transport |
-| Quantum ES 4 | USB-C | ❌ | ❌ | ❌ | ❌ | 🎯 Long-term roadmap; different USB transport |
-| Quantum HD 2 | USB-C | ❌ | ❌ | ❌ | ❌ | 🎯 Long-term roadmap; different USB transport |
-| Quantum HD 8 | USB-C | ❌ | ❌ | ❌ | ❌ | 🎯 Long-term roadmap; different USB transport |
+Only Quantum 2626 (`1c67:0104`, Thunderbolt 3 / PCIe) is currently enabled and
+hardware-tested. Quantum, Quantum 2, and Quantum 4848 remain research targets;
+USB Quantum ES/HD devices use a different transport and are not supported by
+this PCI driver.
 
-A green check means that capability has been observed on owned physical
-hardware. A red X means the repository does not currently support or validate
-that capability; it does not mean the model can never be supported. New device
-IDs will not be enabled from names or static similarity alone.
+The desktop profile is fixed at **48 kHz, 26-channel S32_LE**, exposing 13 stereo
+outputs and 26 mono inputs. Physical analog playback/capture and bounded duplex
+tests have succeeded with the in-house driver. The RFC has separate, mixed
+hardware evidence: a successful cold-boot listening interval, but also DMA/IOMMU
+faults and command timeouts during rate changes and desktop discovery.
 
-PreSonus groups the legacy Thunderbolt and current USB-C models under the
-[Quantum family](https://support.presonus.com/hc/en-us/categories/115000740086-Quantum-Family).
-Its connection guide distinguishes the Quantum 2626's Thunderbolt 3 connection
-from the Thunderbolt 2 connections used by Quantum, Quantum 2, and Quantum 4848:
-[Quantum-series connection guide](https://support.presonus.com/hc/en-us/articles/360040368472-Quantum-2626-Connecting-Quantum-Quantum-2-or-Quantum-4848).
+The RFC implements MIDI, mixer/clock controls, and removal handling; these are
+not established hardware acceptance results here. Its original PCM code exposes
+26 channels at all advertised rates. The in-house backend's separate 26/18/8
+channel constraints must not be attributed to the RFC. Higher rates, physical
+S/PDIF/ADAT routing, sustained stability, and cross-distro hardware behavior need
+further testing. See [current evidence](notes/CURRENT_STATUS.md).
 
-## Linux audio works
+## Releases
 
-> [!IMPORTANT]
-> **The Quantum 2626 is producing real audio on Linux.** The current driver
-> initializes the interface to its solid-blue ready state, plays ordinary
-> desktop audio through PipeWire, captures real input data, and runs playback
-> and capture concurrently on physical Quantum 2626 hardware.
+The [release page](https://github.com/jamie-steele/presonus-quantum2626-linux/releases)
+is the distribution point for experimental RFC snapshots. The release workflow
+checks the ALSA Patchwork feed every six hours and publishes each complete new
+Nicholas Johnson Quantum RFC only after the distro build matrix passes.
+An RFC remains an experimental prerelease even when compilation succeeds.
 
-This is no longer a fake-pointer or register-probing proof of concept. The
-driver uses the recovered TCI mailbox, hardware DMA page tables, real audio
-interrupts, and the hardware position counter. The result has been heard
-through the interface's headphone output and exercised through both direct
-ALSA and normal desktop applications.
+Releases contain the original driver source, DKMS build support, UCM profiles,
+WirePlumber 0.4/0.5 configuration, provenance, checksums, and distro build logs.
+Debian, Ubuntu, Fedora, openSUSE Tumbleweed, and Arch are the x86_64 CI targets;
+derivatives and other kernels require their own validation. There is no universal
+precompiled `.ko`: DKMS builds for the installed kernel and rebuilds on upgrades.
 
-### What works today
+See [installation, distro dependencies, and release operation](docs/RELEASES.md).
+Native packaging adds an Ubuntu/Debian `quantum-dkms` DEB and Fedora/openSUSE RPMs
+after install, upgrade, and removal checks. Use your package manager to install the
+downloaded file; matching kernel headers are required. An opt-in signed APT feed
+is configured for ongoing updates. See the guide for the production URL, signing-key
+verification, deployment status, and migration from
+the tar installer. Arch retains the source/DKMS installation path.
 
-- The recovered TCI mailbox reaches the device-ready state; the interface's
-  indicator is solid blue after the Linux handshake.
-- Direct ALSA playback is stable in the proven 48 kHz, 26-channel, S32_LE,
-  128-frame-period configuration.
-- Playback channels 1 and 2 are physically confirmed through the left and
-  right headphone outputs.
-- Ordinary YouTube audio plays through the Quantum PipeWire sink and is
-  physically audible through the connected headphones.
-- The bundled ALSA UCM profile exposes Main plus every 48 kHz output pair over
-  a shared multichannel stream. WirePlumber publishes all 13 named playback
-  sinks.
-- A 26-channel capture PCM is live-proven through direct ALSA and concurrent
-  PipeWire playback/capture. UCM publishes all 26 Mic/Line/S/PDIF/ADAT inputs
-  as independent mono sources—including a standalone, live-tested Line Input
-  5 instead of a forced 5/6 stereo pair.
-- Playback and capture run concurrently through the shared hardware engine;
-  bounded duplex tests completed without an xrun, DMA timeout, or stop failure.
+## Build from this repository
 
-The current live-proven contract remains fixed at 48 kHz. The repository source
-now implements native 44.1, 48, 88.2, 96, 176.4, and 192 kHz selection with the
-recovered 26/18/8-channel profiles, but that new clock-changing path has passed
-only offline build and static checks. Other analog outputs, physical S/PDIF/ADAT
-paths, and every non-48 kHz profile still need bounded hardware validation.
-
-The canonical evidence and current limitations are in
-[`notes/CURRENT_STATUS.md`](notes/CURRENT_STATUS.md). The exact channel layout
-is in [`notes/CHANNEL_ROUTING.md`](notes/CHANNEL_ROUTING.md).
-
-## Build
+Install matching kernel headers, a compiler, Make, Git, and curl, then run:
 
 ```bash
-make -C driver
+make -C driver upstream-sync
+make -C driver W=1
 ```
 
-The build requires headers for the running kernel. Compilation proves source
-compatibility only; it does not prove a hardware path safe.
+`driver/upstream.lock` pins the original RFC by URL and hashes. The explicit sync
+downloads into an external cache; ordinary builds are offline. Automated releases
+carry their own RFC manifest and do not silently change this reviewed source pin.
+For the in-house fallback, use `make -C driver QUANTUM_DRIVER=inhouse W=1`.
 
-## Install
-
-From `driver/`, the install target places both the kernel module and the ALSA
-UCM desktop profile:
+Choose the backend explicitly when installing:
 
 ```bash
-cd driver
-sudo make install
-sudo modprobe snd-quantum2626
+sudo make -C driver install-upstream
+# Fallback: sudo make -C driver install-inhouse
 ```
 
-Module load/unload, audio-service changes, playback, capture, and hardware
-probing are live tests. Follow
-[`docs/agents/hardware-testing.md`](docs/agents/hardware-testing.md) and
-establish a fresh test boundary before running them.
+Installation writes the chosen module, desktop configuration, and a modprobe
+policy blacklisting the alternate backend, then refreshes initramfs using
+`update-initramfs`, `dracut`, or `mkinitcpio`. It does not load/unload modules or
+restart audio services. The selected driver takes effect on a later boot.
+Existing explicit module-load rules can override blacklist-based autoload policy;
+verify the actual binding after reboot. Secure Boot needs a trusted module signature.
 
 ## Repository map
 
 | Path | Purpose |
 | --- | --- |
-| `driver/` | Kernel module and build/install targets. |
-| `alsa/` | UCM desktop routing for the proven 48 kHz duplex layout. |
-| `notes/CURRENT_STATUS.md` | Canonical consolidated hardware and implementation status. |
-| `notes/CHANNEL_ROUTING.md` | Vendor channel order plus Linux playback-pair and mono-input bindings. |
-| `notes/TCI_PROTOCOL.md` | Recovered mailbox registers and command framing. |
-| `scripts/ghidra/` | Reproducible analysis helpers; proprietary inputs stay outside the repo. |
-| `docs/agents/` | Agent guidance and durable task routing. |
+| `driver/upstream.lock` | Reviewed default RFC source and hashes. |
+| `driver/` | Build/install integration and in-house research fallback. |
+| `alsa/` | Fixed-48-kHz UCM routing and WirePlumber policy. |
+| `scripts/release/`, `packaging/`, `.github/workflows/` | RFC detection, source releases, and distro verification. |
+| `notes/CURRENT_STATUS.md` | Canonical hardware evidence and limitations. |
+| `notes/CHANNEL_ROUTING.md`, `notes/TCI_PROTOCOL.md` | Channel layout and recovered protocol. |
+| `scripts/ghidra/`, `driver-reference/` | Discovery helpers; proprietary inputs remain ignored. |
+| `docs/agents/` | Focused agent guidance and durable task records. |
 
-## Known limits
+Older findings remain available as research history. Use the current status and
+[testing guide](docs/LINUX_TESTING.md) before acting on old commands. This cleanup
+does not grant new hardware acceptance or authorize register sweeps.
 
-- Only the Quantum 2626 PCI ID is enabled. The other models in the family
-  support matrix are roadmap targets and are not claimed or probed by this
-  driver.
-- The tracked UCM desktop profile remains fixed to the live-proven 48 kHz,
-  26-channel layout. Direct ALSA/DAW use of the new native-rate source requires
-  the matching full raw frame: 26 channels at 44.1/48, 18 at 88.2/96, and 8 at
-  176.4/192 kHz.
-- No mixer controls, MIDI, live-proven high-rate profile, or hot-removal proof
-  exists yet.
-- End-to-end latency and release-performance tuning are not complete; no sub-millisecond or
-  professional real-time performance claim is made yet.
-- Capture is live-proven at 48 kHz through direct ALSA and PipeWire duplex tests.
-- ADAT routing is statically identified, not physically confirmed on Linux.
-
-This repository contains no proprietary driver binary or bulk decompiler
-output. Local reverse-engineering artifacts are intentionally ignored.
+Repository-authored material retains its existing license. RFC release bundles
+preserve Nicholas Johnson's authorship, source SPDX notices, and GPL-2.0 text;
+the root MIT license does not relicense the upstream driver.

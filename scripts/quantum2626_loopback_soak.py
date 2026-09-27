@@ -33,6 +33,7 @@ from typing import Iterable, Sequence
 
 
 RATE = 44_100
+SUPPORTED_RATES = (44_100, 48_000)
 PERIOD_FRAMES = 128
 BUFFER_FRAMES = 512
 HARDWARE_CHANNELS = 26
@@ -155,6 +156,69 @@ def extract_s32le_channel(payload: bytes, channels: int, channel_index: int) -> 
     return selected.tobytes()
 
 
+class BoundedByteBuffer:
+    """A preallocated byte ring that bounds stream isolation independently of pipe limits."""
+
+    def __init__(self, capacity: int):
+        if capacity < 1:
+            raise SoakError(f"buffer capacity must be positive: {capacity}")
+        self.capacity = capacity
+        self.storage = bytearray(capacity)
+        self.read_offset = 0
+        self.write_offset = 0
+        self.size = 0
+        self.max_size = 0
+        self.closed = False
+        self.error: str | None = None
+        self.condition = threading.Condition()
+
+    def write(self, payload: bytes) -> None:
+        view = memoryview(payload)
+        offset = 0
+        while offset < len(view):
+            with self.condition:
+                while self.size == self.capacity and not self.closed:
+                    self.condition.wait()
+                if self.closed:
+                    raise SoakError("userspace isolation buffer closed while writing")
+                count = min(
+                    len(view) - offset,
+                    self.capacity - self.size,
+                    self.capacity - self.write_offset,
+                )
+                self.storage[self.write_offset : self.write_offset + count] = view[
+                    offset : offset + count
+                ]
+                self.write_offset = (self.write_offset + count) % self.capacity
+                self.size += count
+                self.max_size = max(self.max_size, self.size)
+                offset += count
+                self.condition.notify_all()
+
+    def read(self, maximum: int) -> bytes:
+        if maximum < 1:
+            raise SoakError(f"buffer read size must be positive: {maximum}")
+        with self.condition:
+            while self.size == 0 and not self.closed:
+                self.condition.wait()
+            if self.size == 0:
+                if self.error is not None:
+                    raise SoakError(self.error)
+                return b""
+            count = min(maximum, self.size, self.capacity - self.read_offset)
+            payload = bytes(self.storage[self.read_offset : self.read_offset + count])
+            self.read_offset = (self.read_offset + count) % self.capacity
+            self.size -= count
+            self.condition.notify_all()
+            return payload
+
+    def close(self, error: str | None = None) -> None:
+        with self.condition:
+            self.closed = True
+            self.error = error
+            self.condition.notify_all()
+
+
 def extract_channel_stream(
     source,
     destination,
@@ -162,8 +226,58 @@ def extract_channel_stream(
     channel_index: int,
     block_frames: int,
     ready_fd: int | None = None,
+    buffer_bytes: int = 0,
 ) -> None:
     """Continuously drain interleaved capture and forward one channel."""
+    block_bytes = block_frames * channels * 4
+    output_block_bytes = block_frames * 4
+
+    if buffer_bytes:
+        buffer = BoundedByteBuffer(buffer_bytes)
+
+        def drain_source() -> None:
+            try:
+                while True:
+                    payload = source.read(block_bytes)
+                    if not payload:
+                        buffer.close()
+                        return
+                    while len(payload) < block_bytes:
+                        chunk = source.read(block_bytes - len(payload))
+                        if not chunk:
+                            raise SoakError(
+                                f"short extractor block: {len(payload)} of {block_bytes} bytes"
+                            )
+                        payload += chunk
+                    buffer.write(extract_s32le_channel(payload, channels, channel_index))
+            except Exception as error:
+                buffer.close(f"buffered capture reader failed: {error}")
+
+        reader = threading.Thread(
+            target=drain_source,
+            name="capture-buffer-reader",
+            daemon=True,
+        )
+        reader.start()
+        if ready_fd is not None:
+            try:
+                os.write(ready_fd, f"R:{buffer.capacity}\n".encode("ascii"))
+            except OSError as error:
+                raise SoakError(
+                    f"cannot signal buffered capture extractor readiness: {error}"
+                ) from error
+            finally:
+                os.close(ready_fd)
+        while True:
+            payload = buffer.read(output_block_bytes)
+            if not payload:
+                reader.join(timeout=1)
+                if reader.is_alive():
+                    raise SoakError("buffered capture reader did not terminate after EOF")
+                return
+            destination.write(payload)
+            destination.flush()
+
     if ready_fd is not None:
         try:
             os.write(ready_fd, b"R")
@@ -171,7 +285,6 @@ def extract_channel_stream(
             raise SoakError(f"cannot signal capture extractor readiness: {error}") from error
         finally:
             os.close(ready_fd)
-    block_bytes = block_frames * channels * 4
     while True:
         payload = source.read(block_bytes)
         if not payload:
@@ -356,7 +469,46 @@ def synthetic_block(
     return output
 
 
-def run_self_test() -> None:
+def run_self_test(transport: str = "all") -> None:
+    ring_fixture = BoundedByteBuffer(32)
+    ring_payload = bytes(range(96))
+
+    def write_ring_fixture() -> None:
+        ring_fixture.write(ring_payload)
+        ring_fixture.close()
+
+    ring_writer = threading.Thread(target=write_ring_fixture, daemon=True)
+    ring_writer.start()
+    with ring_fixture.condition:
+        deadline = time.monotonic() + 2.0
+        while ring_fixture.size < ring_fixture.capacity and time.monotonic() < deadline:
+            ring_fixture.condition.wait(timeout=0.01)
+        if ring_fixture.size != ring_fixture.capacity:
+            raise SoakError(
+                "userspace ring fixture did not enforce its exact capacity: "
+                f"size={ring_fixture.size} capacity={ring_fixture.capacity}"
+            )
+    ring_output = bytearray()
+    while True:
+        chunk = ring_fixture.read(11)
+        if not chunk:
+            break
+        ring_output.extend(chunk)
+    ring_writer.join(timeout=1)
+    if ring_writer.is_alive() or bytes(ring_output) != ring_payload:
+        raise SoakError("userspace ring fixture changed or stranded buffered bytes")
+    if ring_fixture.max_size != ring_fixture.capacity:
+        raise SoakError("userspace ring fixture never reached its exact capacity")
+    failed_ring = BoundedByteBuffer(16)
+    failed_ring.close("userspace ring fixture failure")
+    try:
+        failed_ring.read(1)
+    except SoakError as error:
+        if str(error) != "userspace ring fixture failure":
+            raise
+    else:
+        raise SoakError("userspace ring fixture did not propagate its reader failure")
+
     reference = make_reference()
     packed = playback_period(reference, -30.0)
     if len(packed) != len(reference) * 2 * 4:
@@ -410,17 +562,30 @@ def run_self_test() -> None:
             str(len(reference)),
             "--ready-fd",
             str(ready_write),
+            "--buffer-bytes",
+            str(PIPE_BYTES),
         ],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         pass_fds=(ready_write,),
     )
+    if extractor.stdin is None or extractor.stdout is None:
+        raise SoakError("direct-ALSA extractor fixture has incomplete pipes")
+    direct_capture_kernel_pipes = {
+        "raw": pipe_capacity(extractor.stdin),
+        "mono": pipe_capacity(extractor.stdout),
+    }
     os.close(ready_write)
     try:
-        wait_for_extractor_ready(extractor, ready_read)
+        direct_capture_buffer_bytes = wait_for_extractor_ready(extractor, ready_read)
     finally:
         os.close(ready_read)
+    if direct_capture_buffer_bytes != PIPE_BYTES:
+        raise SoakError(
+            "direct-ALSA capture userspace buffer is "
+            f"{direct_capture_buffer_bytes}, required {PIPE_BYTES}"
+        )
     extractor_stdout, extractor_stderr = extractor.communicate(input=direct_packed * 3)
     if extractor.returncode != 0:
         raise SoakError(
@@ -445,9 +610,11 @@ def run_self_test() -> None:
             "--channel-index",
             "0",
             "--block-frames",
-            str(len(reference)),
+            str(ANALYSIS_FRAMES),
             "--ready-fd",
             str(pipewire_ready_write),
+            "--buffer-bytes",
+            str(PIPE_BYTES),
         ],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -456,14 +623,20 @@ def run_self_test() -> None:
     )
     os.close(pipewire_ready_write)
     try:
-        wait_for_extractor_ready(pipewire_extractor, pipewire_ready_read)
+        pipewire_buffer_bytes = wait_for_extractor_ready(
+            pipewire_extractor, pipewire_ready_read
+        )
     finally:
         os.close(pipewire_ready_read)
     if pipewire_extractor.stdin is None or pipewire_extractor.stdout is None:
         raise SoakError("PipeWire extractor fixture has incomplete pipes")
-    pipewire_raw_pipe = set_pipe_capacity(pipewire_extractor.stdin)
-    pipewire_mono_pipe = set_pipe_capacity(pipewire_extractor.stdout)
-    mono_fixture = direct_selected * 3
+    if pipewire_buffer_bytes != PIPE_BYTES:
+        raise SoakError(
+            f"PipeWire userspace buffer is {pipewire_buffer_bytes}, required {PIPE_BYTES}"
+        )
+    pipewire_raw_pipe = pipe_capacity(pipewire_extractor.stdin)
+    pipewire_mono_pipe = pipe_capacity(pipewire_extractor.stdout)
+    mono_fixture = direct_selected[: ANALYSIS_FRAMES * 4] * 80
     pipewire_stdout, pipewire_stderr = pipewire_extractor.communicate(input=mono_fixture)
     if pipewire_extractor.returncode != 0:
         raise SoakError(
@@ -472,21 +645,30 @@ def run_self_test() -> None:
         )
     if pipewire_stdout != mono_fixture:
         raise SoakError("PipeWire isolated capture extractor changed mono samples")
-    pipewire_buffer_seconds = min(pipewire_raw_pipe, pipewire_mono_pipe) / (RATE * 4)
-    maximum_loss_seconds = MAX_CONSECUTIVE_LOST_BLOCKS * ANALYSIS_FRAMES / RATE
-    if pipewire_buffer_seconds <= maximum_loss_seconds:
-        raise SoakError(
-            "PipeWire capture isolation cannot absorb the fail-closed analysis window: "
-            f"buffer={pipewire_buffer_seconds:.6f}s required>{maximum_loss_seconds:.6f}s"
-        )
-    pipe_read, pipe_write = os.pipe()
-    try:
-        resized_pipe = set_pipe_capacity(pipe_write)
-    finally:
-        os.close(pipe_read)
-        os.close(pipe_write)
-    if resized_pipe < PIPE_BYTES:
-        raise SoakError(f"transport pipe remained too small: {resized_pipe}")
+    pipewire_buffer_seconds_by_rate = {
+        rate: pipewire_buffer_bytes / (rate * 4)
+        for rate in SUPPORTED_RATES
+    }
+    for rate, pipewire_buffer_seconds in pipewire_buffer_seconds_by_rate.items():
+        maximum_loss_seconds = MAX_CONSECUTIVE_LOST_BLOCKS * ANALYSIS_FRAMES / rate
+        if pipewire_buffer_seconds <= maximum_loss_seconds:
+            raise SoakError(
+                "PipeWire capture isolation cannot absorb the fail-closed analysis window: "
+                f"rate={rate} buffer={pipewire_buffer_seconds:.6f}s "
+                f"required>{maximum_loss_seconds:.6f}s"
+            )
+    direct_capture_buffer_seconds_by_rate = {
+        rate: direct_capture_buffer_bytes / (rate * 4)
+        for rate in SUPPORTED_RATES
+    }
+    for rate, buffer_seconds in direct_capture_buffer_seconds_by_rate.items():
+        maximum_loss_seconds = MAX_CONSECUTIVE_LOST_BLOCKS * ANALYSIS_FRAMES / rate
+        if buffer_seconds <= maximum_loss_seconds:
+            raise SoakError(
+                "direct-ALSA capture isolation cannot absorb the fail-closed analysis window: "
+                f"rate={rate} buffer={buffer_seconds:.6f}s "
+                f"required>{maximum_loss_seconds:.6f}s"
+            )
     scheduling = process_scheduling(os.getpid())
     required_scheduling = {
         "policy",
@@ -736,10 +918,15 @@ def run_self_test() -> None:
     fixture_nodes = {"playback": {"name": "fixture-sink"}, "capture": {"name": "fixture-source"}}
     pipewire_commands = stream_commands("pipewire", fixture_nodes)
     alsa_commands = stream_commands("alsa", fixture_nodes)
+    pipewire_48k_commands = stream_commands("pipewire", fixture_nodes, 48_000)
+    alsa_48k_commands = stream_commands("alsa", fixture_nodes, 48_000)
     if pipewire_commands[0][0] != "pw-play" or pipewire_commands[1][0] != "pw-record":
         raise SoakError("PipeWire command fixture selected the wrong helpers")
     if alsa_commands[0][0] != "aplay" or alsa_commands[1][0] != "arecord":
         raise SoakError("direct-ALSA command fixture selected the wrong helpers")
+    for command in (*pipewire_48k_commands, *alsa_48k_commands):
+        if "48000" not in command:
+            raise SoakError(f"48-kHz command fixture lost its selected rate: {command}")
     for command in alsa_commands:
         required = {
             ALSA_DEVICE,
@@ -792,8 +979,13 @@ def run_self_test() -> None:
 
     # Verify that playback can run outside the analysis interpreter.
     read_fd, write_fd = os.pipe()
+    feeder_kernel_pipe_bytes = pipe_capacity(write_fd)
     feeder_payload = b"quantum2626-feeder-fixture"
-    feeder_pid = spawn_playback_feeder(os.fdopen(write_fd, "wb", buffering=0), feeder_payload)
+    feeder_pid, feeder_buffer_bytes = spawn_playback_feeder(
+        os.fdopen(write_fd, "wb", buffering=0),
+        feeder_payload,
+        PIPE_BYTES if transport in ("all", "alsa") else 0,
+    )
     received = bytearray()
     try:
         while len(received) < len(feeder_payload) * 3:
@@ -806,11 +998,29 @@ def run_self_test() -> None:
         terminate_playback_feeder(feeder_pid)
     if received != feeder_payload * 3:
         raise SoakError("isolated playback feeder fixture mismatch")
+    if transport in ("all", "alsa") and feeder_buffer_bytes != PIPE_BYTES:
+        raise SoakError(
+            "direct-ALSA playback userspace buffer is "
+            f"{feeder_buffer_bytes}, required {PIPE_BYTES}"
+        )
+    direct_playback_buffer_seconds_by_rate = {
+        rate: PIPE_BYTES / (rate * HARDWARE_CHANNELS * 4)
+        for rate in SUPPORTED_RATES
+    }
+    for rate, buffer_seconds in direct_playback_buffer_seconds_by_rate.items():
+        hardware_buffer_seconds = BUFFER_FRAMES / rate
+        if buffer_seconds <= hardware_buffer_seconds:
+            raise SoakError(
+                "direct-ALSA playback isolation does not exceed the hardware buffer: "
+                f"rate={rate} buffer={buffer_seconds:.6f}s "
+                f"required>{hardware_buffer_seconds:.6f}s"
+            )
     minimum = min(abs(item.correlation) for item in results)
     print(
         json.dumps(
             {
                 "result": "pass",
+                "transport": transport,
                 "clean_min_abs_correlation": round(minimum, 6),
                 "repeated_period_delta_frames": repeat.phase_delta,
                 "skipped_period_delta_frames": skip.phase_delta,
@@ -824,13 +1034,38 @@ def run_self_test() -> None:
                 "isolated_capture_extractor": True,
                 "isolated_pipewire_capture": True,
                 "capture_extractor_ready_handshake": True,
-                "direct_alsa_pipe_bytes": resized_pipe,
-                "pipewire_capture_pipe_bytes": min(
-                    pipewire_raw_pipe, pipewire_mono_pipe
+                "direct_alsa_isolation_mode": "userspace_byte_rings",
+                "direct_alsa_playback_isolation_bytes": (
+                    feeder_buffer_bytes if transport in ("all", "alsa") else None
                 ),
+                "direct_alsa_playback_buffer_seconds_by_rate": {
+                    str(rate): round(seconds, 6)
+                    for rate, seconds in direct_playback_buffer_seconds_by_rate.items()
+                },
+                "direct_alsa_capture_isolation_bytes": direct_capture_buffer_bytes,
+                "direct_alsa_kernel_pipe_bytes": {
+                    "playback": feeder_kernel_pipe_bytes,
+                    **direct_capture_kernel_pipes,
+                },
+                "direct_alsa_capture_buffer_seconds_by_rate": {
+                    str(rate): round(seconds, 6)
+                    for rate, seconds in direct_capture_buffer_seconds_by_rate.items()
+                },
+                "pipewire_capture_buffer_mode": "userspace_byte_ring",
+                "userspace_buffer_capacity_enforced": True,
+                "pipewire_capture_isolation_bytes": pipewire_buffer_bytes,
+                "pipewire_capture_kernel_pipe_bytes": {
+                    "raw": pipewire_raw_pipe,
+                    "mono": pipewire_mono_pipe,
+                },
                 "pipewire_capture_buffer_seconds": round(
-                    pipewire_buffer_seconds, 6
+                    pipewire_buffer_seconds_by_rate[RATE], 6
                 ),
+                "pipewire_capture_buffer_seconds_by_rate": {
+                    str(rate): round(seconds, 6)
+                    for rate, seconds in pipewire_buffer_seconds_by_rate.items()
+                },
+                "supported_live_rates": list(SUPPORTED_RATES),
                 "pipewire_error_transition_telemetry": True,
                 "process_scheduling_telemetry": True,
                 "thread_scheduling_telemetry": True,
@@ -973,11 +1208,11 @@ def parse_hw_params(path: pathlib.Path) -> dict[str, str]:
     return values
 
 
-def validate_geometry() -> dict[str, dict[str, str]]:
+def validate_geometry(rate: int = RATE) -> dict[str, dict[str, str]]:
     expected = {
         "format": "S32_LE",
         "channels": str(HARDWARE_CHANNELS),
-        "rate": str(RATE),
+        "rate": str(rate),
         "period_size": str(PERIOD_FRAMES),
         "buffer_size": str(BUFFER_FRAMES),
     }
@@ -989,7 +1224,7 @@ def validate_geometry() -> dict[str, dict[str, str]]:
     for direction, values in observed.items():
         for key, required in expected.items():
             actual = values.get(key)
-            # ALSA reports rate as "44100 (44100/1)" on some kernels.
+            # ALSA may append the exact rational form, for example "48000 (48000/1)".
             if key == "rate" and actual and actual.split()[0] == required:
                 continue
             if actual != required:
@@ -1032,7 +1267,9 @@ def alsa_status(direction: str) -> dict[str, str] | None:
     return values
 
 
-def wait_for_geometry(playback: subprocess.Popen, capture: subprocess.Popen) -> dict:
+def wait_for_geometry(
+    playback: subprocess.Popen, capture: subprocess.Popen, rate: int = RATE
+) -> dict:
     deadline = time.monotonic() + 4.0
     last_error: Exception | None = None
     while time.monotonic() < deadline:
@@ -1046,7 +1283,7 @@ def wait_for_geometry(playback: subprocess.Popen, capture: subprocess.Popen) -> 
                 + json.dumps(exits, sort_keys=True)
             )
         try:
-            return validate_geometry()
+            return validate_geometry(rate)
         except SoakError as error:
             last_error = error
         time.sleep(0.1)
@@ -1055,32 +1292,36 @@ def wait_for_geometry(playback: subprocess.Popen, capture: subprocess.Popen) -> 
 
 def wait_for_extractor_ready(
     process: subprocess.Popen, descriptor: int, timeout_seconds: float = 2.0
-) -> None:
+) -> int | None:
     """Wait until the isolated extractor is actively ready to drain capture."""
     readable, _, _ = select.select([descriptor], [], [], timeout_seconds)
     if not readable:
         raise SoakError("capture extractor did not become ready within two seconds")
-    marker = os.read(descriptor, 1)
+    marker = os.read(descriptor, 64)
+    if marker == b"R":
+        return None
+    if marker.startswith(b"R:") and marker.endswith(b"\n"):
+        try:
+            return int(marker[2:-1].decode("ascii"))
+        except ValueError:
+            pass
     if marker != b"R":
         raise SoakError(
             "capture extractor exited before readiness: "
             f"status={child_exit_status(process.pid)} marker={marker!r}"
         )
+    return None
 
 
-def set_pipe_capacity(handle_or_fd, requested: int = PIPE_BYTES) -> int:
-    """Enlarge a transport pipe or fail before a live stream can depend on it."""
+def pipe_capacity(handle_or_fd) -> int:
+    """Read one kernel pipe's current capacity without changing it."""
     descriptor = (
         handle_or_fd if isinstance(handle_or_fd, int) else handle_or_fd.fileno()
     )
     try:
-        fcntl.fcntl(descriptor, fcntl.F_SETPIPE_SZ, requested)
-        actual = fcntl.fcntl(descriptor, fcntl.F_GETPIPE_SZ)
+        return int(fcntl.fcntl(descriptor, fcntl.F_GETPIPE_SZ))
     except OSError as error:
-        raise SoakError(f"cannot size transport pipe to {requested} bytes: {error}") from error
-    if actual < requested:
-        raise SoakError(f"transport pipe is {actual} bytes, required {requested}")
-    return actual
+        raise SoakError(f"cannot read transport pipe capacity: {error}") from error
 
 
 def child_exit_status(pid: int) -> dict[str, object] | None:
@@ -1519,19 +1760,120 @@ def write_forever(handle, payload: bytes) -> None:
             offset += written
 
 
-def spawn_playback_feeder(handle, payload: bytes) -> int:
-    """Fork a dedicated feeder and close the parent's copy of the pipe."""
+def write_buffered_forever(
+    handle,
+    payload: bytes,
+    buffer_bytes: int,
+    ready_fd: int,
+) -> None:
+    """Pre-fill and drain an exact userspace ring from the isolated feeder process."""
+    buffer = BoundedByteBuffer(buffer_bytes)
+
+    def fill_buffer() -> None:
+        try:
+            while True:
+                buffer.write(payload)
+        except Exception as error:
+            buffer.close(f"buffered playback producer failed: {error}")
+
+    producer = threading.Thread(
+        target=fill_buffer,
+        name="playback-buffer-producer",
+        daemon=True,
+    )
+    producer.start()
+    with buffer.condition:
+        while buffer.size < buffer.capacity and not buffer.closed:
+            buffer.condition.wait()
+        if buffer.closed:
+            raise SoakError(buffer.error or "buffered playback producer closed early")
+    os.write(ready_fd, f"R:{buffer.capacity}\n".encode("ascii"))
+    os.close(ready_fd)
+    ready_fd = -1
+    while True:
+        chunk = buffer.read(64 * 1024)
+        if not chunk:
+            return
+        view = memoryview(chunk)
+        offset = 0
+        while offset < len(view):
+            try:
+                written = handle.write(view[offset:])
+                handle.flush()
+            except (BrokenPipeError, OSError):
+                return
+            if not written:
+                return
+            offset += written
+
+
+def wait_for_feeder_ready(pid: int, descriptor: int, timeout_seconds: float = 2.0) -> int:
+    """Require the forked feeder to admit its exact userspace ring before proceeding."""
+    readable, _, _ = select.select([descriptor], [], [], timeout_seconds)
+    if not readable:
+        raise SoakError("playback feeder did not become ready within two seconds")
+    marker = os.read(descriptor, 64)
+    if marker.startswith(b"R:") and marker.endswith(b"\n"):
+        try:
+            return int(marker[2:-1].decode("ascii"))
+        except ValueError:
+            pass
+    raise SoakError(
+        "playback feeder exited before readiness: "
+        f"status={child_exit_status(pid)} marker={marker!r}"
+    )
+
+
+def spawn_playback_feeder(
+    handle, payload: bytes, buffer_bytes: int = 0
+) -> tuple[int, int | None]:
+    """Fork a dedicated feeder and optionally admit an exact userspace ring."""
+    if not payload:
+        raise SoakError("playback feeder payload must not be empty")
+    ready_read: int | None = None
+    ready_write: int | None = None
+    if buffer_bytes:
+        ready_read, ready_write = os.pipe()
     try:
         pid = os.fork()
     except OSError as error:
+        if ready_read is not None:
+            os.close(ready_read)
+        if ready_write is not None:
+            os.close(ready_write)
         raise SoakError(f"cannot fork playback feeder: {error}") from error
     if pid == 0:
+        exit_code = 0
         try:
-            write_forever(handle, payload)
+            if ready_read is not None:
+                os.close(ready_read)
+            if buffer_bytes:
+                assert ready_write is not None
+                write_buffered_forever(handle, payload, buffer_bytes, ready_write)
+            else:
+                write_forever(handle, payload)
+        except Exception:
+            exit_code = 1
+            if ready_write is not None:
+                try:
+                    os.write(ready_write, b"E\n")
+                except OSError:
+                    pass
         finally:
-            os._exit(0)
+            os._exit(exit_code)
     handle.close()
-    return pid
+    admitted_bytes = None
+    if ready_write is not None:
+        os.close(ready_write)
+    if ready_read is not None:
+        try:
+            admitted_bytes = wait_for_feeder_ready(pid, ready_read)
+        except Exception:
+            terminate_playback_feeder(pid)
+            raise
+        finally:
+            os.close(ready_read)
+    return pid, admitted_bytes
 
 
 def terminate_playback_feeder(pid: int | None) -> int | None:
@@ -1683,7 +2025,9 @@ def terminate(process: subprocess.Popen | None) -> None:
             process.wait(timeout=2)
 
 
-def stream_commands(transport: str, nodes: dict) -> tuple[list[str], list[str]]:
+def stream_commands(
+    transport: str, nodes: dict, rate: int = RATE
+) -> tuple[list[str], list[str]]:
     if transport == "pipewire":
         return (
             [
@@ -1691,7 +2035,7 @@ def stream_commands(transport: str, nodes: dict) -> tuple[list[str], list[str]]:
                 "--target",
                 nodes["playback"]["name"],
                 "--rate",
-                str(RATE),
+                str(rate),
                 "--channels",
                 "2",
                 "--channel-map",
@@ -1707,7 +2051,7 @@ def stream_commands(transport: str, nodes: dict) -> tuple[list[str], list[str]]:
                 "--target",
                 nodes["capture"]["name"],
                 "--rate",
-                str(RATE),
+                str(rate),
                 "--channels",
                 "1",
                 "--channel-map",
@@ -1729,7 +2073,7 @@ def stream_commands(transport: str, nodes: dict) -> tuple[list[str], list[str]]:
             "--format",
             "S32_LE",
             "--rate",
-            str(RATE),
+            str(rate),
             "--channels",
             str(HARDWARE_CHANNELS),
             "--period-size",
@@ -1797,7 +2141,7 @@ def run_soak(args: argparse.Namespace) -> None:
     playback_bytes = interleaved_playback_period(
         reference, args.level_dbfs, playback_channels, playback_channel
     )
-    playback_command, capture_command = stream_commands(args.transport, nodes)
+    playback_command, capture_command = stream_commands(args.transport, nodes, args.rate)
     playback_stderr = "pw-play.stderr" if args.transport == "pipewire" else "aplay.stderr"
     capture_stderr = "pw-record.stderr" if args.transport == "pipewire" else "arecord.stderr"
     tracker = PhaseTracker(reference)
@@ -1840,7 +2184,7 @@ def run_soak(args: argparse.Namespace) -> None:
                 log,
                 "start",
                 nodes=nodes,
-                rate=RATE,
+                rate=args.rate,
                 hardware_channels=HARDWARE_CHANNELS,
                 period_frames=PERIOD_FRAMES,
                 buffer_frames=BUFFER_FRAMES,
@@ -1856,8 +2200,17 @@ def run_soak(args: argparse.Namespace) -> None:
                 rtkit_rttime_usec=(
                     RTKIT_RTTIME_USEC if args.rtkit_helper_priority else None
                 ),
-                capture_pipeline_mode="isolated_extractor",
-                capture_pipe_required_bytes=PIPE_BYTES,
+                capture_pipeline_mode="isolated_extractor_userspace_ring",
+                capture_isolation_required_bytes=PIPE_BYTES,
+                capture_pipe_required_bytes=None,
+                playback_pipeline_mode=(
+                    "isolated_feeder_userspace_ring"
+                    if args.transport == "alsa"
+                    else "isolated_feeder"
+                ),
+                playback_isolation_required_bytes=(
+                    PIPE_BYTES if args.transport == "alsa" else None
+                ),
                 pipewire_data_loops=initial_pipewire_data_loops,
             )
 
@@ -1890,30 +2243,42 @@ def run_soak(args: argparse.Namespace) -> None:
                 )
             if playback.stdin is None:
                 raise SoakError("failed to create playback pipe")
-            if args.transport == "alsa":
-                pipe_capacities["playback_input"] = set_pipe_capacity(playback.stdin)
+            pipe_capacities["playback_input"] = pipe_capacity(playback.stdin)
             # Fork before starting the telemetry thread. The feeder must not
             # share the analysis interpreter's GIL or fork a threaded process.
-            writer_pid = spawn_playback_feeder(playback.stdin, playback_bytes)
+            writer_pid, playback_buffer_bytes = spawn_playback_feeder(
+                playback.stdin,
+                playback_bytes,
+                PIPE_BYTES if args.transport == "alsa" else 0,
+            )
+            if args.transport == "alsa":
+                if playback_buffer_bytes != PIPE_BYTES:
+                    raise SoakError(
+                        "playback userspace isolation is "
+                        f"{playback_buffer_bytes}, required {PIPE_BYTES}"
+                    )
+                pipe_capacities["playback_userspace"] = playback_buffer_bytes
             time.sleep(0.25)
             capture_channels, capture_channel = capture_extractor_geometry(args.transport)
             capture_pipe_read, capture_pipe_write = os.pipe()
-            pipe_capacities["capture_raw"] = set_pipe_capacity(capture_pipe_write)
+            pipe_capacities["capture_raw"] = pipe_capacity(capture_pipe_write)
             extractor_ready_read, extractor_ready_write = os.pipe()
+            extractor_command = [
+                sys.executable,
+                str(pathlib.Path(__file__).resolve()),
+                "extract-channel",
+                "--channels",
+                str(capture_channels),
+                "--channel-index",
+                str(capture_channel),
+                "--block-frames",
+                str(ANALYSIS_FRAMES),
+                "--ready-fd",
+                str(extractor_ready_write),
+            ]
+            extractor_command.extend(["--buffer-bytes", str(PIPE_BYTES)])
             capture_extractor = subprocess.Popen(
-                [
-                    sys.executable,
-                    str(pathlib.Path(__file__).resolve()),
-                    "extract-channel",
-                    "--channels",
-                    str(capture_channels),
-                    "--channel-index",
-                    str(capture_channel),
-                    "--block-frames",
-                    str(ANALYSIS_FRAMES),
-                    "--ready-fd",
-                    str(extractor_ready_write),
-                ],
+                extractor_command,
                 stdin=capture_pipe_read,
                 stdout=subprocess.PIPE,
                 stderr=(output_dir / "capture-extractor.stderr").open("xb"),
@@ -1924,9 +2289,17 @@ def run_soak(args: argparse.Namespace) -> None:
             capture_pipe_read = None
             os.close(extractor_ready_write)
             extractor_ready_write = None
-            wait_for_extractor_ready(capture_extractor, extractor_ready_read)
+            extractor_buffer_bytes = wait_for_extractor_ready(
+                capture_extractor, extractor_ready_read
+            )
             os.close(extractor_ready_read)
             extractor_ready_read = None
+            if extractor_buffer_bytes != PIPE_BYTES:
+                raise SoakError(
+                    "capture userspace isolation is "
+                    f"{extractor_buffer_bytes}, required {PIPE_BYTES}"
+                )
+            pipe_capacities["capture_userspace"] = extractor_buffer_bytes
             try:
                 try:
                     capture = subprocess.Popen(
@@ -1950,7 +2323,7 @@ def run_soak(args: argparse.Namespace) -> None:
                 capture_pipe_write = None
             if capture_extractor.stdout is None:
                 raise SoakError("failed to create capture extractor pipe")
-            pipe_capacities["capture_mono"] = set_pipe_capacity(capture_extractor.stdout)
+            pipe_capacities["capture_mono"] = pipe_capacity(capture_extractor.stdout)
             capture_stream = capture_extractor.stdout
             capture_pipeline_ready = True
             pw_top_writer = threading.Thread(
@@ -1998,7 +2371,7 @@ def run_soak(args: argparse.Namespace) -> None:
                 rtkit_promotions=rtkit_promotions,
             )
             scheduling_telemetry_started = True
-            geometry = wait_for_geometry(playback, capture)
+            geometry = wait_for_geometry(playback, capture, args.rate)
             json_line(log, "geometry", values=geometry)
 
             block_bytes = ANALYSIS_FRAMES * 4
@@ -2146,7 +2519,7 @@ def run_soak(args: argparse.Namespace) -> None:
                         **telemetry,
                     )
                     next_telemetry = now + 1.0
-                    validate_geometry()
+                    validate_geometry(args.rate)
                     if shutil.disk_usage(output_dir).free < 256 * 1024 * 1024:
                         raise SoakError("disk free space fell below 256 MiB")
 
@@ -2245,8 +2618,13 @@ def run_soak(args: argparse.Namespace) -> None:
             "max_loss_blocks": max_loss_blocks,
             "output_dir": str(output_dir),
             "transport": args.transport,
+            "rate": args.rate,
             "capture_pipeline_isolated": capture_pipeline_ready,
-            "capture_pipe_required_bytes": PIPE_BYTES,
+            "capture_isolation_required_bytes": PIPE_BYTES,
+            "capture_pipe_required_bytes": None,
+            "playback_isolation_required_bytes": (
+                PIPE_BYTES if args.transport == "alsa" else None
+            ),
             "pipewire_error_transitions_recorded": pipewire_error_tracking_started,
             "scheduling_telemetry_recorded": scheduling_telemetry_started,
             "rtkit_helper_priority": args.rtkit_helper_priority or None,
@@ -2278,12 +2656,18 @@ def duration_seconds(value: str) -> int:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="command", required=True)
-    commands.add_parser("self-test", help="run offline clean and injected-fault fixtures")
+    self_test = commands.add_parser(
+        "self-test", help="run offline clean and injected-fault fixtures"
+    )
+    self_test.add_argument(
+        "--transport", choices=("all", "pipewire", "alsa"), default="all"
+    )
     extract = commands.add_parser("extract-channel", help=argparse.SUPPRESS)
     extract.add_argument("--channels", type=int, required=True)
     extract.add_argument("--channel-index", type=int, required=True)
     extract.add_argument("--block-frames", type=int, required=True)
     extract.add_argument("--ready-fd", type=int, default=None, help=argparse.SUPPRESS)
+    extract.add_argument("--buffer-bytes", type=int, default=0, help=argparse.SUPPRESS)
     replay = commands.add_parser(
         "replay", help="read-only global classification of retained events"
     )
@@ -2292,6 +2676,7 @@ def parser() -> argparse.ArgumentParser:
     inspect.add_argument("--capture-fragment", default=CAPTURE_FRAGMENT)
     run = commands.add_parser("run", help="open the exact nodes and perform a live soak")
     run.add_argument("--duration", dest="duration_seconds", type=duration_seconds, required=True)
+    run.add_argument("--rate", type=int, choices=SUPPORTED_RATES, default=RATE)
     run.add_argument("--output-dir", required=True)
     run.add_argument("--level-dbfs", type=float, default=-30.0)
     run.add_argument("--max-events", type=int, default=1_000)
@@ -2306,7 +2691,7 @@ def main() -> int:
     args = parser().parse_args()
     try:
         if args.command == "self-test":
-            run_self_test()
+            run_self_test(args.transport)
         elif args.command == "extract-channel":
             extract_channel_stream(
                 sys.stdin.buffer,
@@ -2315,6 +2700,7 @@ def main() -> int:
                 args.channel_index,
                 args.block_frames,
                 args.ready_fd,
+                args.buffer_bytes,
             )
         elif args.command == "replay":
             print(json.dumps(replay_artifacts(pathlib.Path(args.artifact_dir)), sort_keys=True))
