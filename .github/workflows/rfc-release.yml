@@ -153,3 +153,11 @@ jobs:
           gh release upload "$TAG" bundle/quantum-*.tar.gz bundle/SHA256SUMS \
             bundle/manifest.json bundle/distro-build-evidence.tar.gz --clobber
           gh release edit "$TAG" --draft=false --prerelease --latest=false
+
+  native-packages:
+    needs: [prepare, publish]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/native-packages.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
