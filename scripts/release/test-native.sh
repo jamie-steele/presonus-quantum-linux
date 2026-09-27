@@ -27,6 +27,7 @@ check_installed() {
     test -f /usr/share/alsa/ucm2/P2626/HiFi.conf
     test -f /usr/share/wireplumber/main.lua.d/51-quantum2626.lua
     test -f /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
+    python3 /workspace/scripts/release/validate-audio.py /usr/share/alsa
 }
 
 old_version=$(python3 -c 'import json,glob,sys; print(json.load(open(glob.glob(sys.argv[1]+"/native-*-manifest.json")[0]))["native_version"])' "$packages")

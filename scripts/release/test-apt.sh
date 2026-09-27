@@ -52,6 +52,13 @@ apt_command apt-get update
 apt_command apt-cache policy quantum-dkms | grep -F "Candidate: $new_version"
 apt_command apt-cache policy quantum-dkms | grep -F "Installed: $old_version"
 
+# Resolve against the real distro repositories, not only the isolated index.
+# This catches unsupported dependency floors even when metadata tests pass.
+install -m 0644 "$work/source.list" /etc/apt/sources.list.d/quantum-test.list
+apt-get -o APT::Update::Error-Mode=any update
+apt-get --simulate --no-remove install quantum-dkms
+rm /etc/apt/sources.list.d/quantum-test.list
+
 # Corrupt signed metadata: APT must reject it instead of accepting an unsigned feed.
 sed -i 's/Origin: PreSonus/Origin: Tampered/' "$work/public/dists/experimental/InRelease"
 if apt_command apt-get -o APT::Update::Error-Mode=any update; then
@@ -66,4 +73,4 @@ if apt_command apt-get -o APT::Update::Error-Mode=any update; then
     echo 'ERROR: APT accepted expired metadata.' >&2
     exit 1
 fi
-echo 'PASS: signed APT update, download, upgrade candidate, tamper rejection, and expiry rejection.'
+echo 'PASS: signed APT update, download, dependency resolution, upgrade candidate, tamper rejection, and expiry rejection.'

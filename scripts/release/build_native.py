@@ -42,13 +42,14 @@ def stage(bundle, destination, version):
     if count != 1:
         raise ValueError("Unexpected DKMS version declaration")
     config.write_text(updated)
-    shutil.copytree(bundle / "alsa/ucm2", destination / "usr/share/alsa/ucm2")
+    # Desktop integration belongs to the packaging revision, not the RFC pin.
+    shutil.copytree(ROOT / "alsa/ucm2", destination / "usr/share/alsa/ucm2")
     # Each WirePlumber generation reads only its own configuration directory.
     for name, directory in (("51-quantum2626.lua", "main.lua.d"),
                             ("51-quantum2626.conf", "wireplumber.conf.d")):
         target = destination / "usr/share/wireplumber" / directory / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(bundle / "alsa/wireplumber" / name, target)
+        shutil.copyfile(ROOT / "alsa/wireplumber" / name, target)
     target = destination / "etc/modprobe.d/quantum2626-backend.conf"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(bundle / "quantum2626-backend.conf", target)
@@ -73,7 +74,7 @@ Section: kernel
 Priority: optional
 Architecture: amd64
 Maintainer: PreSonus Quantum Linux contributors <jamie-steele@users.noreply.github.com>
-Depends: dkms (>= 3), build-essential, kmod, alsa-ucm-conf, wireplumber (>= 0.4), initramfs-tools
+Depends: dkms (>= 2.8.7), build-essential, kmod, alsa-ucm-conf, wireplumber (>= 0.4), initramfs-tools
 Homepage: {HOMEPAGE}
 Description: Experimental PreSonus Quantum RFC driver and desktop audio profiles
  Nicholas Johnson's unmerged snd-quantum RFC, built locally through DKMS.
@@ -177,6 +178,10 @@ def build(bundle, output, revision):
     metadata = {
         "upstream": json.loads((bundle / "manifest.json").read_text()),
         "native_version": version,
+        "audio_sha256": {
+            str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted((ROOT / "alsa").rglob("*")) if path.is_file()
+        },
         "packaging_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "packaging_dirty": bool(subprocess.check_output(

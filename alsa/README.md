@@ -29,6 +29,12 @@ higher-rate kernel capability remains separate from this desktop default.
 
 ## Install
 
+The profile uses UCM Syntax 4 and explicit device values so the same routing can
+be parsed by Ubuntu 22.04's ALSA 1.2.6 as well as newer releases. Keep the 13 stereo
+output and 26 mono input bindings identical when changing its representation.
+Do not introduce newer UCM macros without testing the oldest supported parser.
+This is parser compatibility, not proof of a working desktop session or hardware.
+
 `make install-audio` from `driver/` installs the UCM files and the matching
 WirePlumber 0.4 Lua or 0.5 SPA-JSON rule, selected from the installed version.
 Set `WIREPLUMBER_SERIES=0.4|0.5` explicitly for staging. `make install-ucm` and `make install-wireplumber`
