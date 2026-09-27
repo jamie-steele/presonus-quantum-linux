@@ -58,7 +58,7 @@ analyzeHeadless <project_path> <project_name> -process pae_quantum.sys -script f
 
 **Use for Linux:** Treat the ordered list as corroborating static-analysis evidence. Do not paste
 unknown writes into the driver or probe them live without reconciling them with the TCI mailbox
-contract in `docs/agents/tasks/tci-mailbox-macos-trace-pivot.md`.
+contract in `docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md`.
 
 ### 5. `ExportNamedFunctions.java`
 
