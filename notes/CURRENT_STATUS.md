@@ -31,6 +31,11 @@
   Ubuntu container verified the production key, HTTPS index, dependency resolution,
   and authenticated DEB download. No new boot, Secure Boot, or physical audio acceptance
   is implied; installation and key-verification instructions are in `docs/RELEASES.md`.
+- A user install on Pop!_OS 22.04 exposed the revision-1 DEB's unnecessary DKMS-3
+  dependency. Packaging revision 2 is being validated with DKMS 2.8.7, expanded
+  Ubuntu/Debian release gates, an older-WirePlumber version probe, and equivalent
+  Syntax-4 UCM profiles. Revision 1 remains the published baseline until the fix
+  is explicitly released. No new hardware or desktop-session acceptance is implied.
 
 ## Historical Summary Through 2026-08-21
 

@@ -31,10 +31,18 @@ initramfs_tool() {
 wireplumber_series() {
     local version=${WIREPLUMBER_SERIES:-auto}
     if [[ "$version" == auto ]]; then
-        version=$(wireplumber --version)
-        if [[ "$version" =~ [[:space:]]0\.4\. ]]; then
+        if ! version=$(wireplumber --version 2>/dev/null); then
+            # Jammy's WirePlumber 0.4.8 predates --version.
+            if command -v dpkg-query >/dev/null; then
+                version=$(dpkg-query -W -f='${Version}' wireplumber)
+            else
+                echo 'Cannot detect WirePlumber version; set WIREPLUMBER_SERIES=0.4 or 0.5.' >&2
+                return 1
+            fi
+        fi
+        if [[ "$version" =~ (^|[[:space:]])([0-9]+:)?0\.4\. ]]; then
             version=0.4
-        elif [[ "$version" =~ [[:space:]]0\.[5-9]\. ]]; then
+        elif [[ "$version" =~ (^|[[:space:]])([0-9]+:)?0\.[5-9]\. ]]; then
             version=0.5
         else
             echo 'Unknown WirePlumber version; set WIREPLUMBER_SERIES=0.4 or 0.5.' >&2

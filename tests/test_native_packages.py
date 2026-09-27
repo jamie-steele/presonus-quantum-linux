@@ -23,6 +23,18 @@ apt = load_module("apt_repository")
 
 
 class NativePackageTests(unittest.TestCase):
+    def test_deb_supports_jammy_dkms_without_changing_system_dkms(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(native.subprocess, "run"):
+                native.build_deb(root / "payload", root, "20260820.rfc1.s1148921-2", {})
+            control = (root / "payload/DEBIAN/control").read_text()
+            self.assertIn("Depends: dkms (>= 2.8.7),", control)
+            for version, accepted in (("2.8.7-2ubuntu2.2", True), ("3.0.11", True),
+                                      ("2.8.6", False)):
+                result = subprocess.run(["dpkg", "--compare-versions", version, "ge", "2.8.7"])
+                self.assertEqual(result.returncode == 0, accepted)
+
     def test_versions_are_scoped_to_rfc_and_packaging_revision(self):
         with tempfile.TemporaryDirectory() as temporary:
             bundle = Path(temporary)
@@ -56,7 +68,15 @@ class NativePackageTests(unittest.TestCase):
                 native.write(bundle / name, content)
             destination = root / "stage"
             version = "20260820.rfc1.s1148921-2"
-            native.stage(bundle, destination, version)
+            # The current packaging profile overrides the immutable tar profile.
+            native.write(root / "alsa/ucm2/P2626/HiFi.conf", "compatible profile\n")
+            native.write(root / "alsa/wireplumber/51-quantum2626.lua", "lua\n")
+            native.write(root / "alsa/wireplumber/51-quantum2626.conf", "json\n")
+            with patch.object(native, "ROOT", root):
+                native.stage(bundle, destination, version)
+            self.assertEqual((destination / "usr/share/alsa/ucm2/P2626/HiFi.conf").read_text(),
+                             "compatible profile\n")
+            self.assertEqual((bundle / "alsa/ucm2/P2626/HiFi.conf").read_text(), "profile\n")
             source = destination / "usr/src" / f"quantum-{version}"
             self.assertEqual((source / "quantum_main.c").read_bytes(),
                              (bundle / "module/quantum_main.c").read_bytes())
