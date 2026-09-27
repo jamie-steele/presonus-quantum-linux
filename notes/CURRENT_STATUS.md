@@ -27,8 +27,10 @@
   from source builds or packaging tests; the earlier DMA/discovery failures remain relevant.
 - Native DEB/RPM package lifecycle and signed APT metadata tooling are locally verified;
   [TASK-016](../docs/agents/tasks/closed/native-package-distribution.md) records the evidence.
-  Native release attachment and production APT signing/Pages activation remain separate
-  maintainer steps. No new boot, Secure Boot, or physical audio acceptance is implied.
+  Native DEB/RPM assets and the signed production APT feed are now published. A fresh
+  Ubuntu container verified the production key, HTTPS index, dependency resolution,
+  and authenticated DEB download. No new boot, Secure Boot, or physical audio acceptance
+  is implied; installation and key-verification instructions are in `docs/RELEASES.md`.
 
 ## Historical Summary Through 2026-08-21
 
