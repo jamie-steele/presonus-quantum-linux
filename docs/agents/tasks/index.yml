@@ -8,15 +8,7 @@ task_system:
 
 # Legacy implementation and migration work is completed or superseded by upstream.
 # Known limitations remain in notes/CURRENT_STATUS.md; they are not automatic tasks.
-tasks:
-  - id: TASK-017
-    title: Distribution compatibility regression coverage
-    path: docs/agents/tasks/distribution-compatibility.md
-    summary: Fix the Pop!_OS Jammy dependency failure and gate packaging against older Ubuntu, Debian and derivative bases.
-    status: active
-    load_when:
-      - fixing native dependency or desktop-profile compatibility
-      - extending distro release gates or publishing packaging revision 2
+tasks: []
 
 archives:
   - id: closed-tasks
