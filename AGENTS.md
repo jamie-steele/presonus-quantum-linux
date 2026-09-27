@@ -1,8 +1,9 @@
 # PreSonus Quantum Linux Agent Router
 
-PreSonus Quantum Linux is an experimental Linux audio support project aiming to cover the full
-PreSonus Quantum family. Its current out-of-tree ALSA PCI driver is enabled and hardware-tested
-only for the Quantum 2626 Thunderbolt interface. This file is the small, always-loaded router;
+PreSonus Quantum Linux is a discovery, research, desktop-integration, and experimental release
+project. Nicholas Johnson's upstream RFC `snd-quantum` is the default driver; the in-house
+`snd-quantum2626` is a research fallback. Only Quantum 2626 is enabled and hardware-tested,
+with separate evidence for each backend. This file is the small, always-loaded router;
 durable guidance lives under `docs/agents/`.
 
 ## Loading Protocol
@@ -11,7 +12,8 @@ durable guidance lives under `docs/agents/`.
 2. Read `docs/agents/index.yml`.
 3. Load only the entries whose `load_when` conditions match the task.
 4. For substantial or multi-session work, check `docs/agents/tasks/index.yml` before creating or
-   resuming a task record.
+   resuming a task record. Follow its `archives` route to `closed/index.yml` for completed work
+   and check both indexes before assigning a new task ID.
 5. Expand context only when repository evidence or a linked dependency requires it.
 
 ## Non-Negotiable Rules
@@ -20,8 +22,9 @@ durable guidance lives under `docs/agents/`.
   local reverse-engineering artifacts.
 - Treat repository evidence as authoritative. Distinguish confirmed hardware observations, static
   reverse-engineering findings, hypotheses, and stale documentation.
-- Read `notes/CURRENT_STATUS.md` before relying on older summaries in `README.md` or
-  `driver/README.md`; verify important claims against `driver/snd-quantum2626.c`.
+- Read `notes/CURRENT_STATUS.md` before relying on older summaries. Verify upstream claims
+  against the source identified by `driver/upstream.lock` and fallback claims against
+  `driver/snd-quantum2626.c`; never transfer one backend's hardware acceptance to the other.
 - Never add proprietary driver binaries, large traces, credentials, host identifiers, or generated
   Ghidra/build state. Respect `.gitignore` and keep temporary captures outside the repository unless
   the user asks to preserve a sanitized result.

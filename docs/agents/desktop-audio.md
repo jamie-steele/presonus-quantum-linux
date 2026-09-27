@@ -9,7 +9,8 @@ work.
 2. `notes/CHANNEL_ROUTING.md`
 3. `alsa/README.md`
 4. `alsa/ucm2/P2626/HiFi.conf`
-5. `driver/snd-quantum2626.c` for the current PCM constraints
+5. The RFC source pinned by `driver/upstream.lock` for default PCM constraints;
+   `driver/snd-quantum2626.c` for fallback-only constraints
 
 ## Boundaries
 
