@@ -1,3 +1,5 @@
+import datetime
+from email.utils import format_datetime
 import importlib.util
 import hashlib
 import os
@@ -89,6 +91,47 @@ class NativePackageTests(unittest.TestCase):
         for command in ("modprobe", "rmmod", "systemctl", "service"):
             self.assertNotRegex(text, rf"(?m)^\s*{command}\s")
         self.assertIn('dkms remove -m quantum -v "$version" --all', text)
+
+    def test_apt_health_requires_signed_validity_with_recovery_headroom(self):
+        now = datetime.datetime(2026, 10, 23, tzinfo=datetime.timezone.utc)
+        cases = (
+            (now, now + datetime.timedelta(days=14), True),
+            (now, now + datetime.timedelta(days=7, seconds=1), True),
+            (now, now + datetime.timedelta(days=7), False),
+            (now - datetime.timedelta(days=17), now - datetime.timedelta(days=3), False),
+            (now + datetime.timedelta(hours=1), now + datetime.timedelta(days=14), False),
+            (now, now - datetime.timedelta(seconds=1), False),
+        )
+        for published, expiry, healthy in cases:
+            with self.subTest(published=published, expiry=expiry):
+                metadata = (
+                    f"Date: {format_datetime(published)}\n"
+                    f"Valid-Until: {format_datetime(expiry)}\n"
+                )
+                if healthy:
+                    self.assertEqual(apt.check_freshness(metadata, now), expiry)
+                else:
+                    with self.assertRaises(ValueError):
+                        apt.check_freshness(metadata, now)
+
+    def test_apt_health_rejects_missing_duplicate_and_unzoned_dates(self):
+        now = datetime.datetime(2026, 10, 23, tzinfo=datetime.timezone.utc)
+        published = f"Date: {format_datetime(now)}\n"
+        expiry = f"Valid-Until: {format_datetime(now + datetime.timedelta(days=14))}\n"
+        for metadata in (published, expiry, published + published + expiry,
+                         published + expiry + expiry,
+                         published + "Valid-Until: Fri, 06 Nov 2026 00:00:00\n"):
+            with self.subTest(metadata=metadata), self.assertRaises(ValueError):
+                apt.check_freshness(metadata, now)
+
+    def test_apt_health_does_not_parse_unverified_metadata(self):
+        with patch.object(apt.subprocess, "run") as command, patch.object(apt, "urlopen") as fetch:
+            fetch.return_value.__enter__.return_value.read.return_value = b"tampered signature"
+            command.side_effect = [None, subprocess.CalledProcessError(1, "gpgv")]
+            with patch.object(apt, "check_freshness") as freshness:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    apt.verify("https://example.invalid/quantum")
+                freshness.assert_not_called()
 
     def test_apt_requires_https_and_full_fingerprint(self):
         with tempfile.TemporaryDirectory() as temporary:
