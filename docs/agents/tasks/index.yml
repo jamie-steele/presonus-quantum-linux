@@ -8,9 +8,9 @@ task_system:
 
 tasks:
   - id: TASK-019
-    title: Ubuntu installation cleanup
+    title: Ubuntu migration and cleanup
     path: docs/agents/tasks/ubuntu-cleanup.md
-    summary: Implement conservative preview/backup/removal for legacy and native installs and test issue-30 cleanup on disposable Ubuntu systems.
+    summary: Conservative standalone cleanup and revision-3 DEB migration with pre-unpack backups and disposable distro validation for issue 30.
     status: active
     load_when:
       - changing Ubuntu cleanup or investigating legacy installation residue

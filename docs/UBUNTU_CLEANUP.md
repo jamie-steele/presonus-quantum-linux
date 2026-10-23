@@ -5,6 +5,12 @@ The cleanup helper removes recognized installations of this project's in-house
 the published tar/DKMS installer, the native `quantum-dkms` DEB, and residual DEB
 configuration. It does not diagnose or promise to fix missing audio or high CPU.
 
+The revision-3 DEB adds automatic migration of recognized legacy installs
+(described in [the release guide](RELEASES.md#automatic-legacy-migration-in-deb-revision-3)).
+It is prepared for review and not yet published. Once available, normal migration
+to that package does not require a separate full cleanup. This helper remains
+optional for recovery, uninstalling, and custom states requiring inspection.
+
 From a reviewed repository checkout, preview first:
 
 ```bash
