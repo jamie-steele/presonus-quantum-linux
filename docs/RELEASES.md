@@ -276,6 +276,11 @@ installation before retrying.
 
 ## Remove or roll back
 
+For an inventory and backed-up removal of recognized Ubuntu installations, see
+[Ubuntu cleanup and reinstall](UBUNTU_CLEANUP.md). Preview first; custom/shared
+configuration remains a manual review item. Cleanup does not establish the cause
+of an audio or CPU problem.
+
 Record the installed version with `dkms status`, then run
 `sudo dkms remove -m quantum -v <version> --all` to remove that release's modules.
 Keep or restore the UCM/WirePlumber files according to your chosen fallback.

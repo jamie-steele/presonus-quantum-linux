@@ -7,6 +7,14 @@ task_system:
   template: docs/agents/tasks/task-template.md
 
 tasks:
+  - id: TASK-019
+    title: Ubuntu installation cleanup
+    path: docs/agents/tasks/ubuntu-cleanup.md
+    summary: Implement conservative preview/backup/removal for legacy and native installs and test issue-30 cleanup on disposable Ubuntu systems.
+    status: active
+    load_when:
+      - changing Ubuntu cleanup or investigating legacy installation residue
+      - reviewing issue-30 cleanup validation
   - id: TASK-018
     title: APT metadata renewal recovery
     path: docs/agents/tasks/apt-renewal-recovery.md
