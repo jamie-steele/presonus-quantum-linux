@@ -91,7 +91,38 @@ errors, install headers, and reinstall the package. Reboot when ready and verify
 `lspci -nnk` reports `snd_quantum`. Secure Boot still requires your distro's DKMS
 key enrollment. Installation success alone is not boot or audio acceptance.
 
-### Migrating from the tar installer
+### Automatic legacy migration in DEB revision 3
+
+Revision 3 is prepared for review; it is not yet published to the signed feed.
+The driver RFC is unchanged. The DEB adds Python 3 for conservative migration
+using the same inventory rules as the standalone cleanup tool. RPMs do not run the migration helper.
+
+On installation or upgrade, the DEB saves existing Quantum profiles and backend
+policy under root-only `/var/backups/quantum-migration/preinstall.*` directories
+before unpacking new files. Configuration then builds the replacement for every
+installed kernel with usable headers. Only after all builds succeed does it
+back up and retire recognized older Quantum DKMS registrations and manual
+modules in `updates`/`extra`, then install the new module last. This ordering
+prevents old DKMS removal from deleting the newly installed module. If a build
+fails, this migration has not retired the older tar registration or manual
+module files. Native-package upgrades still follow dpkg's existing maintainer
+script lifecycle. Repair the error and run `sudo dpkg --configure quantum-dkms`
+before rebooting.
+
+The exact generated in-house backend policy is replaced with the RFC policy.
+Customized conffiles retain ordinary dpkg handling. Shared configuration, user
+home overrides, distro modules, other packages' files and unfamiliar/symlinked
+paths are preserved or reported for review. Symlinks at incoming profile paths
+stop pre-installation rather than being followed. Migration does not unload a
+driver, restart services, remove APT configuration or enroll signing keys.
+
+For recognized legacy installs, the revision-3 package removes the need to run a
+separate cleanup first. The standalone tool remains optional recovery/uninstall
+support. Backups are not automatically restored after a failed package
+transaction: inspect them, repair/reconfigure the package, and restore custom
+settings selectively before rebooting.
+
+### Migrating manually with older packages or RPMs
 
 Back up customized Quantum UCM/WirePlumber files and
 `/etc/modprobe.d/quantum2626-backend.conf`. Native packages own the same profile
@@ -100,7 +131,7 @@ is a Debian conffile / RPM `%config(noreplace)` file: retain local settings only
 after confirming they do not blacklist the new `snd-quantum` driver. Review any
 `.dpkg-dist` or `.rpmnew` file. Reconcile custom `modules-load.d` rules separately.
 
-Run `dkms status`. Remove the **old tar-installed Quantum version only**, for example
+Run `dkms status`. For older DEBs and RPMs without automatic migration, remove the **old tar-installed Quantum version only**, for example
 `sudo dkms remove -m quantum -v 20260820.rfc1.s1148921 --all`, before the first native
 install. Do not remove unrelated modules or run the tar installer over the native
 package. This does not unload the currently running module. Subsequent native
@@ -276,6 +307,11 @@ installation before retrying.
 
 ## Remove or roll back
 
+For an inventory and backed-up removal of recognized Ubuntu installations, see
+[Ubuntu cleanup and reinstall](UBUNTU_CLEANUP.md). Preview first; custom/shared
+configuration remains a manual review item. Cleanup does not establish the cause
+of an audio or CPU problem.
+
 Record the installed version with `dkms status`, then run
 `sudo dkms remove -m quantum -v <version> --all` to remove that release's modules.
 Keep or restore the UCM/WirePlumber files according to your chosen fallback.
@@ -374,3 +410,32 @@ Secure Boot enrollment, Thunderbolt enumeration, or physical audio on those dist
 VM boot tests can extend that evidence, but emulated machines without the interface
 cannot validate its DMA/audio path. Known upstream rate-transition and discovery
 failures remain in `notes/CURRENT_STATUS.md`; every RFC release is experimental.
+
+### Local DEB migration qualification
+
+After building the native candidate and a synthetic next-revision upgrade, run:
+
+```bash
+dockpipe workflow validate workflows/quantum-native-test/config.yml
+dockpipe --no-vault --no-compile-deps --workflow quantum-native-test \
+  --var QUANTUM_NATIVE_BUNDLE=/absolute/source-downloads \
+  --var QUANTUM_NATIVE_PACKAGES=/absolute/native-candidate \
+  --var QUANTUM_NATIVE_UPGRADE=/absolute/synthetic-upgrade \
+  --var QUANTUM_NATIVE_EVIDENCE=/absolute/test-evidence
+```
+
+The source-download directory contains the release tarball and `SHA256SUMS`;
+package directories contain the DEBs and their `native-<revision>-manifest.json`.
+This DockPipe workflow uses the same package lifecycle and migration scripts as
+CI for Ubuntu 22.04/24.04 and Debian 12/13. The migration case installs the old
+tar release and fallback module, checks pre-unpack backups, deliberately fails a
+replacement build, verifies old registrations remain, then retries configuration
+and checks the new installation. Container results do not establish physical
+audio, Secure Boot enrollment, or bootable initramfs acceptance.
+
+The revision-3 DEB candidate passed local DockPipe qualification on 2026-10-23 for
+Ubuntu 22.04/24.04 and Debian 12/13, including ordinary package upgrade/removal and
+legacy migration. Debian migration fixtures include full matching kernel images
+so the old tar installer's real initramfs refresh can run. The candidate rebuild
+was byte-identical, and all original driver/build/license source files were
+unchanged. Hosted native/RPM gates and revision-3 publication remain pending.

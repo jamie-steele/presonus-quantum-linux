@@ -95,3 +95,6 @@ driver-reference/pae_quantum.sys
 driver-reference/pae_quantum.inf
 driver-reference/pae_quantum.cat
 driver-reference/pae_quantum.PNF
+
+# Disposable DockPipe workflow state and test receipts
+/bin/.dockpipe/
