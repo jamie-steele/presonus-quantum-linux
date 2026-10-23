@@ -1,0 +1,13 @@
+name: quantum-cleanup-test
+description: Verify conservative Quantum cleanup using real releases in disposable Ubuntu containers.
+vars:
+  QUANTUM_CLEANUP_INPUT: ''
+  QUANTUM_CLEANUP_EVIDENCE: ''
+steps:
+  - id: unit-tests
+    kind: host
+    cmd: python3 -m unittest discover -s tests -v
+  - id: ubuntu-install-cleanup
+    # This host script starts isolated Docker containers through the host daemon.
+    kind: host
+    run: scripts/maintenance/test-cleanup-matrix.sh
