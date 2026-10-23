@@ -96,6 +96,11 @@ dkms remove -m quantum -v "$version" --all
 
 if [[ -n "$native_dir" ]]; then
     bash /workspace/scripts/release/test-native.sh "$family" "$native_dir" "$upgrade_dir" "$kernel"
+    case "$family" in
+        ubuntu|debian)
+            bash /workspace/scripts/release/test-migration.sh "$package" "$native_dir" "$kernel"
+            ;;
+    esac
 else
     python3 /workspace/scripts/release/validate-audio.py "$package/alsa"
 fi

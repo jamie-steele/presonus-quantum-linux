@@ -1,4 +1,4 @@
-# TASK-019 Ubuntu Installation Cleanup
+# TASK-019 Ubuntu Migration And Cleanup
 
 ## Status
 
@@ -6,8 +6,8 @@ Active
 
 ## Objective
 
-Address issue #30 with a conservative Ubuntu cleanup helper and reproducible
-installation/removal evidence. Keep physical audio diagnosis separate.
+Address issue #30 with conservative cleanup and automatic DEB migration of known
+legacy installations. Keep physical audio diagnosis separate.
 
 ## Decisions
 
@@ -30,6 +30,38 @@ installation/removal evidence. Keep physical audio diagnosis separate.
 - workflows/quantum-cleanup-test/config.yml and test-cleanup-matrix.sh: DockPipe
   unit/matrix entrypoint; ignore generated bin/.dockpipe state.
 - docs/UBUNTU_CLEANUP.md and docs/RELEASES.md: preview, recovery and limitations.
+
+## Automatic DEB Migration Follow-Up
+
+- User authorized package migration on 2026-10-23 after reviewing the standalone
+  cleanup approach. Revision 3 keeps the original RFC unchanged.
+- A dependency-free POSIX preinst backs up profiles before dpkg overwrites them;
+  postinst builds all replacement modules before retiring old registrations and
+  installing the new modules last. Python 3 is a normal DEB dependency, never a
+  preinst requirement. RPMs do not run the migration helper.
+- Shared/custom configuration and user home overrides remain preserved. Only the
+  exact generated in-house backend policy is replaced automatically.
+- Added candidate migration tests to the existing Ubuntu/Debian native release
+  gate, including a failed build, retry, reinstall and preservation checks.
+- 45 Python tests pass, including migration ordering, migration/backup failures,
+  preinst symlink rejection, and preserving a module restored by old DKMS removal.
+- DockPipe native validation passed on Ubuntu 22.04 (5.15.0-198), Ubuntu 24.04
+  (6.8.0-147), Debian 12 (6.1.0-54), and Debian 13 (6.12.113+deb13). Each passed
+  revision-3 installation, synthetic revision-4 upgrade/removal, tar/manual
+  migration, deliberate build failure, retry, reinstall and configuration checks.
+  The Ubuntu migration run also covered upgrade from the published revision-2 DEB.
+- Debian initially failed at the old tar installer's initramfs refresh because
+  the fixture had headers but no kernel image/config. The final Debian runs
+  installed matching kernel images and passed the real initramfs operations.
+- The final DEB rebuilt byte-for-byte identically to the tested candidate.
+  SHA-256: `698d12bb6401bb86fddfab5e20726e1c3a47ed7f8d80a690acf9644e68244c75`.
+  All 12 source/build/license files match the verified original RFC bundle;
+  only dkms.conf gets the native package version.
+- Evidence: `/tmp/quantum-migration-validation/evidence/native/` (Ubuntu) and
+  `/tmp/quantum-migration-validation/evidence/debian-final/` (Debian). Firmware
+  and initramfs-container warnings are retained; no boot or audio proof is claimed.
+- Updated the same PR #32 for review. Revision 3 has not been published; no
+  production feed, signing environment, or public issue response was changed.
 
 ## Validation
 

@@ -103,3 +103,8 @@ grep -q 'owned elsewhere' /usr/share/alsa/ucm2/P2626/HiFi.conf
 grep -q 'unrelated-profile' /tmp/cleanup-owned.log
 check_preserved
 printf 'PASS: Ubuntu cleanup: manual module, tar/DKMS, DEB, partial install, residual conffiles, backups, repeat runs and unrelated ownership.\n'
+
+if [[ -d /candidate ]]; then
+    bash /workspace/scripts/release/test-migration.sh "$bundle" /candidate "$kernel" \
+        "$input/quantum-dkms_20260820.rfc1.s1148921-2_amd64.deb"
+fi
