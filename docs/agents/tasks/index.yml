@@ -6,9 +6,15 @@ task_system:
   guide: docs/agents/tasks/README.md
   template: docs/agents/tasks/task-template.md
 
-# Legacy implementation and migration work is completed or superseded by upstream.
-# Known limitations remain in notes/CURRENT_STATUS.md; they are not automatic tasks.
-tasks: []
+tasks:
+  - id: TASK-018
+    title: APT metadata renewal recovery
+    path: docs/agents/tasks/apt-renewal-recovery.md
+    summary: Recovered the expired public feed; prepared queue supersession and deployed signature/freshness verification for issue 29.
+    status: active
+    load_when:
+      - investigating APT expiry or a blocked Pages renewal
+      - publishing the issue-29 workflow correction
 
 archives:
   - id: closed-tasks
