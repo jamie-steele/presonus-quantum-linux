@@ -154,10 +154,40 @@ does not automatically add this origin to unattended-upgrades. Remove
 
 The feed retains published native versions, publishes checksums and signed
 `InRelease`/`Release.gpg`, and expires metadata after 14 days. A daily workflow
-refreshes signatures even without new RFCs. If expiry or signature validation
+refreshes signatures even without new RFCs. Each refresh supersedes an older
+running or waiting refresh, so a stuck Pages deployment cannot hold the renewal
+queue indefinitely. After deployment, a read-back check verifies the live
+`InRelease` against the public key retained in Git and requires more than seven
+days of validity remaining. The signing and deployment jobs have execution
+timeouts; environment approval waits are recovered by the next refresh replacing
+the old run, rather than by those execution timeouts. If expiry or signature validation
 fails, repair publication/key configuration; never use `trusted=yes` or disable
 APT authentication to work around it. Key rotation requires explicit review and
 updating the installed keyring.
+
+### Renewal recovery and monitoring
+
+Watch **Quantum signed APT repository** failures and cancellations in Actions.
+A successful signing job alone does not prove Pages deployed the refreshed feed.
+To check the live endpoint without installing a package or changing local APT:
+
+```bash
+python3 scripts/release/apt_repository.py verify https://jamie-steele.github.io/presonus-quantum-linux
+```
+
+If a run is waiting at an environment gate, inspect the gate and deployment policy.
+Cancel the stale **APT workflow run only**, then dispatch `apt-repository.yml` on
+the default branch. Recheck the deployed signature, expiry, and an isolated APT
+update before declaring recovery. Do not approve an old artifact whose signed
+metadata is already expired. Keep `apt-signing` and `github-pages` branch
+restrictions in place.
+
+GitHub schedules can be delayed or disabled on inactive repositories. Check that
+the daily schedule remains enabled; manual dispatch is the recovery path. The
+14-day expiry still protects clients from indefinitely replayed metadata. The
+signing key also has its own expiry: daily metadata renewal does not extend it.
+Renew the key before the date above and distribute the updated public keyring
+through an explicitly reviewed change.
 
 ## Maintainer activation
 
