@@ -47,6 +47,15 @@ transaction before accepting. On an older Mint/Ubuntu desktop, inspect `pactl in
 distro's supported audio-session setup before expecting the WirePlumber policy
 to apply. Direct ALSA support and desktop endpoint discovery are separate checks.
 
+The pending native package revision also addresses [issue #35](https://github.com/jamie-steele/presonus-quantum-linux/issues/35):
+policy templates live outside WirePlumber's configuration search paths, and only
+the rule matching the installed version is linked into place. DEB and RPM file
+triggers reselect the rule on WirePlumber upgrades without rebuilding the driver
+or restarting audio. This removes the obsolete-Lua startup warning on 0.5; it
+does not establish a fix for the slowdown reported in issue #33. The selector
+preserves unexpected custom rules for review; DEB pre-unpack backups also retain
+existing package-owned policy files before upgrades replace them.
+
 Install headers matching your distro's exact kernel, including Pop!_OS or HWE
 kernels. Keep Secure Boot enrollment and custom backend/module-load rules under
 local control. Never disable package signature checks to work around another

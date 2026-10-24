@@ -1,6 +1,14 @@
 # Included in native package scripts; no module loads or service restarts.
 set -eu
 
+configure_wireplumber() {
+    python3 -B /usr/lib/quantum-dkms/wireplumber_policy.py configure
+}
+
+remove_wireplumber() {
+    python3 -B /usr/lib/quantum-dkms/wireplumber_policy.py remove
+}
+
 refresh_boot_images() {
     for modules in /lib/modules/*; do
         [ -d "$modules" ] || continue

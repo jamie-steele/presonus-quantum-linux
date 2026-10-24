@@ -25,8 +25,15 @@ check_installed() {
     dkms status -m quantum -v "$version" -k "$kernel" | grep -q ': installed'
     modinfo -k "$kernel" snd-quantum
     test -f /usr/share/alsa/ucm2/P2626/HiFi.conf
-    test -f /usr/share/wireplumber/main.lua.d/51-quantum2626.lua
-    test -f /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
+    local series
+    series=$(bash /workspace/driver/scripts/host-tools.sh wireplumber)
+    if [[ "$series" == 0.4 ]]; then
+        test -L /usr/share/wireplumber/main.lua.d/51-quantum2626.lua
+        test ! -e /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
+    else
+        test ! -e /usr/share/wireplumber/main.lua.d/51-quantum2626.lua
+        test -L /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
+    fi
     python3 /workspace/scripts/release/validate-audio.py /usr/share/alsa
 }
 
@@ -36,6 +43,7 @@ case "$family" in
     ubuntu|debian)
         apt-get install -y "$packages"/*.deb
         check_installed "$old_version"
+        bash /workspace/scripts/release/test-wireplumber-policy.sh
         apt-get install -y --reinstall "$packages"/*.deb
         check_installed "$old_version"
         printf '\n# preserved native-package test setting\n' >> /etc/modprobe.d/quantum2626-backend.conf
@@ -68,5 +76,7 @@ case "$family" in
         ;;
 esac
 test ! -e /usr/share/alsa/ucm2/P2626/HiFi.conf
+test ! -L /usr/share/wireplumber/main.lua.d/51-quantum2626.lua
+test ! -L /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
 test ! -e /usr/src/quantum-"$new_version"
 echo 'PASS: native install, reinstall, packaging-revision upgrade, config preservation, and removal.'

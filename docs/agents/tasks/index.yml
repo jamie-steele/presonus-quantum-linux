@@ -7,6 +7,14 @@ task_system:
   template: docs/agents/tasks/task-template.md
 
 tasks:
+  - id: TASK-020
+    title: WirePlumber native policy selection
+    path: docs/agents/tasks/wireplumber-native-policy.md
+    summary: Issue-35 native policy selection, upgrade triggers, and obsolete Lua warning prevention.
+    status: active
+    load_when:
+      - changing native WirePlumber policy selection or package file triggers
+      - reviewing issue-35 validation and publication boundaries
   - id: TASK-019
     title: Ubuntu migration and cleanup
     path: docs/agents/tasks/ubuntu-cleanup.md
