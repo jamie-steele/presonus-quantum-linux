@@ -80,8 +80,7 @@ bash "$package/host-tools.sh" check
 if [[ -z "$native_dir" ]]; then
     bash "$package/host-tools.sh" wireplumber
 else
-    # Native packages install both policy formats and do not call the old tar
-    # installer's version probe. Validate the current helper independently.
+    # Validate the current version probe rather than the immutable tar helper.
     bash /workspace/driver/scripts/host-tools.sh wireplumber
 fi
 

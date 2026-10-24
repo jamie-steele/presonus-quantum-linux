@@ -74,6 +74,7 @@ class NativePackageTests(unittest.TestCase):
             native.write(root / "alsa/ucm2/P2626/HiFi.conf", "compatible profile\n")
             native.write(root / "alsa/wireplumber/51-quantum2626.lua", "lua\n")
             native.write(root / "alsa/wireplumber/51-quantum2626.conf", "json\n")
+            native.write(root / "packaging/native/wireplumber_policy.py", "policy helper\n")
             with patch.object(native, "ROOT", root):
                 native.stage(bundle, destination, version)
             self.assertEqual((destination / "usr/share/alsa/ucm2/P2626/HiFi.conf").read_text(),
@@ -84,6 +85,38 @@ class NativePackageTests(unittest.TestCase):
                              (bundle / "module/quantum_main.c").read_bytes())
             self.assertEqual((source / "dkms.conf").read_text(), f'PACKAGE_VERSION="{version}"\n')
             self.assertNotIn("-2", (bundle / "module/dkms.conf").read_text())
+            self.assertTrue((destination / "usr/share/quantum-dkms/wireplumber/51-quantum2626.lua").is_file())
+            self.assertTrue((destination / "usr/share/quantum-dkms/wireplumber/51-quantum2626.conf").is_file())
+            self.assertFalse((destination / "usr/share/wireplumber").exists())
+
+    def test_deb_selects_policy_on_configure_and_wireplumber_upgrade(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = root / "payload"
+            with patch.object(native.subprocess, "run"):
+                native.build_deb(payload, root, "20260820.rfc1.s1148921-3", {})
+            control = payload / "DEBIAN"
+            self.assertEqual((control / "triggers").read_text(),
+                             "interest-noawait /usr/bin/wireplumber\n")
+            postinst = (control / "postinst").read_text()
+            self.assertIn("configure) configure_module; configure_wireplumber", postinst)
+            self.assertIn("triggered) configure_wireplumber", postinst)
+            self.assertIn("remove|deconfigure) remove_wireplumber; remove_module",
+                          (control / "prerm").read_text())
+
+    def test_rpm_reselects_policy_at_transaction_end_and_removes_on_final_uninstall(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = root / "payload"
+            payload.mkdir()
+            with patch.object(native.subprocess, "run"):
+                native.build_rpm(payload, root, "20260820.rfc1.s1148921", "3",
+                                 "fedora", root, {})
+            spec = (root / "fedora/quantum.spec").read_text()
+            self.assertIn("kmod, python3,", spec)
+            self.assertIn("%transfiletriggerin -- /usr/bin/wireplumber "
+                          "/usr/share/quantum-dkms/wireplumber", spec)
+            self.assertIn('if [ "${1:-0}" = 0 ]; then\n    remove_wireplumber\nfi', spec)
 
     def test_lifecycle_is_shell_syntax_valid_and_has_no_live_mutation(self):
         text = native.lifecycle("20260820.rfc1.s1148921-1", "configure_module")
