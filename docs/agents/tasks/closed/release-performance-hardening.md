@@ -7,7 +7,7 @@ index entry was retired on 2026-09-27 after adopting the upstream RFC as the mai
 
 The progress, old host settings, and proposed follow-ups below are historical
 in-house evidence, not a current implementation backlog or upstream operating contract.
-Current limitations belong in `notes/CURRENT_STATUS.md`; any new investigation
+Current limitations belong in `research/notes/CURRENT_STATUS.md`; any new investigation
 must start from a reproduced issue on the selected upstream revision.
 
 ### Recorded Progress
@@ -95,7 +95,7 @@ the proven fixed 48 kHz transport.
 
 ## Relevant Context
 
-- `notes/CURRENT_STATUS.md` owns current hardware and runtime evidence.
+- `research/notes/CURRENT_STATUS.md` owns current hardware and runtime evidence.
 - `driver/snd-quantum2626.c` owns the fixed PCM constraints and shared audio-engine lifecycle.
 - `alsa/ucm2/P2626/HiFi.conf` contains the second candidate: both shared directions
   retain 128-frame periods and request exactly four periods through alsa-lib's direct-plugin
@@ -1422,7 +1422,7 @@ the proven fixed 48 kHz transport.
   causal. Investigate sample continuity below PipeWire accounting—especially dshare/ALSA pointer
   handoff and hardware-period data—without treating lower volume or limiting as a driver fix.
 - **Offline loopback-continuity harness prepared, 2026-08-17:**
-  `scripts/quantum2626_loopback_soak.py` now generates a deterministic low-level sequence on the
+  `scripts/linux/quantum2626_loopback_soak.py` now generates a deterministic low-level sequence on the
   left side of the Line Outputs 3-4 endpoint, tracks it through one exact selected mono input, and
   records compact ALSA pointer, IRQ, PipeWire, and event-window evidence. Its dependency-free
   self-test distinguishes clean/noisy content, corrupted content, an exact repeated 128-frame

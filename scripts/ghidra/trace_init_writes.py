@@ -5,7 +5,7 @@ Use this to find the init sequence needed for blue LED / audio (device not ready
 1. Finds FUN_140003d60 and collects every [base+offset]=value write in instruction order.
 2. Writes init_writes.txt (all) and init_writes_likely.txt (offsets 0x0-0x300, 0x10300-0x10400).
 
-Run: ./scripts/run_ghidra_analysis.sh trace_init_writes.py
+Run: ./scripts/ghidra/run_ghidra_analysis.sh trace_init_writes.py
 """
 
 from ghidra.program.model.listing import InstructionIterator

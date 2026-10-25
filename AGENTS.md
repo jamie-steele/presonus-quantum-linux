@@ -22,9 +22,9 @@ durable guidance lives under `docs/agents/`.
   local reverse-engineering artifacts.
 - Treat repository evidence as authoritative. Distinguish confirmed hardware observations, static
   reverse-engineering findings, hypotheses, and stale documentation.
-- Read `notes/CURRENT_STATUS.md` before relying on older summaries. Verify upstream claims
+- Read `research/notes/CURRENT_STATUS.md` before relying on older summaries. Verify upstream claims
   against the source identified by `driver/upstream.lock` and fallback claims against
-  `driver/snd-quantum2626.c`; never transfer one backend's hardware acceptance to the other.
+  `driver/inhouse/`; never transfer one backend's hardware acceptance to the other.
 - Never add proprietary driver binaries, large traces, credentials, host identifiers, or generated
   Ghidra/build state. Respect `.gitignore` and keep temporary captures outside the repository unless
   the user asks to preserve a sanitized result.

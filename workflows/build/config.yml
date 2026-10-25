@@ -1,0 +1,6 @@
+name: build
+description: Compile the selected driver backend using the native Makefile.
+steps:
+  - id: build
+    kind: host
+    cmd: make -C driver W=1

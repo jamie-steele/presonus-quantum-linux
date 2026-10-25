@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Host DockPipe entrypoint: all package mutations happen in disposable containers.
+# All package mutations happen in disposable containers.
 set -Eeuo pipefail
 repository=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 bundle=${QUANTUM_NATIVE_BUNDLE:?set QUANTUM_NATIVE_BUNDLE}

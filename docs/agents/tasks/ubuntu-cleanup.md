@@ -27,8 +27,8 @@ legacy installations. Keep physical audio diagnosis separate.
 - scripts/maintenance/cleanup-ubuntu.py: discovery, backup, narrow apply, read-back.
 - tests/test_cleanup.py: file selection and failure/preservation boundaries.
 - scripts/maintenance/test-cleanup-ubuntu.sh: real release lifecycle in containers.
-- workflows/quantum-cleanup-test/config.yml and test-cleanup-matrix.sh: DockPipe
-  unit/matrix entrypoint; ignore generated bin/.dockpipe state.
+- scripts/maintenance/test-cleanup-matrix.sh: standalone container matrix entrypoint.
+  The former DockPipe container-test wrapper was retired in favor of direct script use.
 - docs/UBUNTU_CLEANUP.md and docs/RELEASES.md: preview, recovery and limitations.
 
 ## Automatic DEB Migration Follow-Up

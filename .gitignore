@@ -59,6 +59,7 @@ __pycache__/
 *.pdb
 
 # Kernel Module Compile Results
+/build/
 *.mod*
 *.cmd
 .tmp_versions/
@@ -79,7 +80,7 @@ driver/.upstream-src
 scripts/trace_analysis/*.csv
 trace_analysis/*.csv
 
-# Ghidra install and generated project state (scripts/setup_ghidra_linux.sh)
+# Ghidra install and generated project state (scripts/ghidra/setup_ghidra_linux.sh)
 tools/
 *.gpr
 *.rep/
@@ -87,14 +88,14 @@ tools/
 *.ulock
 !driver/upstream.lock
 
-# Generated trace-analysis output; retain conclusions under notes/ instead
+# Generated trace-analysis output; retain conclusions under research/notes/ instead
 scripts/trace_analysis/*.txt
 
-# driver-reference: copyrighted PreSonus/Windows files only (not .txt, etc.)
-driver-reference/pae_quantum.sys
-driver-reference/pae_quantum.inf
-driver-reference/pae_quantum.cat
-driver-reference/pae_quantum.PNF
+# research/windows: copyrighted PreSonus/Windows files only (not .txt, etc.)
+research/windows/pae_quantum.sys
+research/windows/pae_quantum.inf
+research/windows/pae_quantum.cat
+research/windows/pae_quantum.PNF
 
 # Disposable DockPipe workflow state and test receipts
 /bin/.dockpipe/

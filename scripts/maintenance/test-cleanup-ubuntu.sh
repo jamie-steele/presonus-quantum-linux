@@ -47,9 +47,9 @@ check_clean() {
 }
 
 # Real manually installed fallback module, without loading it.
-mkdir /tmp/legacy
-cp /workspace/driver/snd-quantum2626.c /tmp/legacy/
-printf 'obj-m := snd-quantum2626.o\n' > /tmp/legacy/Makefile
+mkdir -p /tmp/legacy/inhouse
+cp /workspace/driver/inhouse/*.[ch] /tmp/legacy/inhouse/
+cp /workspace/driver/inhouse/Kbuild /tmp/legacy/Makefile
 make -j2 -C "/lib/modules/$kernel/build" M=/tmp/legacy modules
 install -m 0644 /tmp/legacy/snd-quantum2626.ko "/lib/modules/$kernel/extra/"
 # Valid ELF sentinels avoid feeding deliberately malformed modules to depmod.

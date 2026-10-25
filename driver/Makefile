@@ -21,7 +21,6 @@ $(error QUANTUM_DRIVER must be one of: $(QUANTUM_DRIVERS))
 endif
 
 ifeq ($(QUANTUM_DRIVER),inhouse)
-obj-m := snd-quantum2626.o
 QUANTUM_MODULE := snd-quantum2626
 else
 ifneq ($(filter upstream-sync upstream-status clean inhouse check-backend-install \
@@ -29,19 +28,12 @@ ifneq ($(filter upstream-sync upstream-status clean inhouse check-backend-instal
 else ifeq ($(wildcard $(UPSTREAM_SOURCE_LINK)/quantum_main.c),)
 $(error pinned upstream source is absent; run 'make -C driver upstream-sync')
 endif
-obj-m := snd-quantum.o
 QUANTUM_MODULE := snd-quantum
-snd-quantum-y := \
-	$(UPSTREAM_SOURCE_LINK)/quantum_main.o \
-	$(UPSTREAM_SOURCE_LINK)/quantum_dma.o \
-	$(UPSTREAM_SOURCE_LINK)/quantum_midi.o \
-	$(UPSTREAM_SOURCE_LINK)/quantum_mixer.o \
-	$(UPSTREAM_SOURCE_LINK)/quantum_pcm.o \
-	$(UPSTREAM_SOURCE_LINK)/quantum_tci.o
 endif
 
 KDIR ?= /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
+BUILD_ROOT ?= $(abspath ../build/driver)
+BUILD_DIR := $(abspath $(BUILD_ROOT)/$(QUANTUM_DRIVER))
 KERNEL_RELEASE ?= $(shell uname -r)
 UCM2_DIR ?= /usr/share/alsa/ucm2
 WIREPLUMBER_MAIN_LUA_DIR ?= /usr/share/wireplumber/main.lua.d
@@ -63,8 +55,9 @@ all: upstream-verify
 endif
 
 all:
-	@echo "Building $(QUANTUM_DRIVER) backend ($(QUANTUM_MODULE).ko)"
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	bash scripts/prepare-build.sh "$(QUANTUM_DRIVER)" "$(BUILD_DIR)"
+	@echo "Building $(QUANTUM_DRIVER) backend ($(BUILD_DIR)/$(QUANTUM_MODULE).ko)"
+	$(MAKE) -C "$(KDIR)" M="$(BUILD_DIR)" QUANTUM_DRIVER="$(QUANTUM_DRIVER)" modules
 
 inhouse:
 	$(MAKE) QUANTUM_DRIVER=inhouse all
@@ -82,10 +75,15 @@ upstream-status:
 	UPSTREAM_CACHE_ROOT="$(UPSTREAM_CACHE_ROOT)" ./$(UPSTREAM_SOURCE_TOOL) status
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	@set -e; for backend in $(QUANTUM_DRIVERS); do \
+		build_dir="$(abspath $(BUILD_ROOT))/$$backend"; \
+		if test -d "$$build_dir"; then \
+			$(MAKE) -C "$(KDIR)" M="$$build_dir" QUANTUM_DRIVER="$$backend" clean; \
+		fi; \
+	done
 
 install-module: all
-	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
+	$(MAKE) -C "$(KDIR)" M="$(BUILD_DIR)" QUANTUM_DRIVER="$(QUANTUM_DRIVER)" modules_install
 	@if test -n "$(INSTALL_MOD_PATH)"; then \
 		depmod -b "$(INSTALL_MOD_PATH)" -a "$(KERNEL_RELEASE)"; \
 	else \

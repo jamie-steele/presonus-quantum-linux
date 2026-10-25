@@ -418,24 +418,24 @@ and validates staged integration. It does not prove boot, initramfs inclusion,
 Secure Boot enrollment, Thunderbolt enumeration, or physical audio on those distros.
 VM boot tests can extend that evidence, but emulated machines without the interface
 cannot validate its DMA/audio path. Known upstream rate-transition and discovery
-failures remain in `notes/CURRENT_STATUS.md`; every RFC release is experimental.
+failures remain in `research/notes/CURRENT_STATUS.md`; every RFC release is experimental.
 
 ### Local DEB migration qualification
 
 After building the native candidate and a synthetic next-revision upgrade, run:
 
 ```bash
-dockpipe workflow validate workflows/quantum-native-test/config.yml
-dockpipe --no-vault --no-compile-deps --workflow quantum-native-test \
-  --var QUANTUM_NATIVE_BUNDLE=/absolute/source-downloads \
-  --var QUANTUM_NATIVE_PACKAGES=/absolute/native-candidate \
-  --var QUANTUM_NATIVE_UPGRADE=/absolute/synthetic-upgrade \
-  --var QUANTUM_NATIVE_EVIDENCE=/absolute/test-evidence
+python3 -m unittest discover -s tests -v
+QUANTUM_NATIVE_BUNDLE=/absolute/source-downloads \
+QUANTUM_NATIVE_PACKAGES=/absolute/native-candidate \
+QUANTUM_NATIVE_UPGRADE=/absolute/synthetic-upgrade \
+QUANTUM_NATIVE_EVIDENCE=/absolute/test-evidence \
+  bash scripts/release/test-native-matrix.sh
 ```
 
 The source-download directory contains the release tarball and `SHA256SUMS`;
 package directories contain the DEBs and their `native-<revision>-manifest.json`.
-This DockPipe workflow uses the same package lifecycle and migration scripts as
+This script uses the same package lifecycle and migration scripts as
 CI for Ubuntu 22.04/24.04 and Debian 12/13. The migration case installs the old
 tar release and fallback module, checks pre-unpack backups, deliberately fails a
 replacement build, verifies old registrations remain, then retries configuration

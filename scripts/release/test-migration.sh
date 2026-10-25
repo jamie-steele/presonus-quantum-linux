@@ -26,9 +26,9 @@ if dpkg-query -W -f='${db:Status-Abbrev}' quantum-dkms 2>/dev/null | grep -q '^i
     dpkg --purge quantum-dkms
 fi
 # Keep a real fallback module and a stale tar/DKMS install present simultaneously.
-mkdir -p /tmp/migration-fallback
-cp /workspace/driver/snd-quantum2626.c /tmp/migration-fallback/
-printf 'obj-m := snd-quantum2626.o\n' > /tmp/migration-fallback/Makefile
+mkdir -p /tmp/migration-fallback/inhouse
+cp /workspace/driver/inhouse/*.[ch] /tmp/migration-fallback/inhouse/
+cp /workspace/driver/inhouse/Kbuild /tmp/migration-fallback/Makefile
 make -j2 -C "/lib/modules/$kernel/build" M=/tmp/migration-fallback modules
 mkdir -p "/lib/modules/$kernel/extra"
 install -m 0644 /tmp/migration-fallback/snd-quantum2626.ko "/lib/modules/$kernel/extra/"

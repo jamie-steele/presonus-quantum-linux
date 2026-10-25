@@ -96,16 +96,16 @@ container test below installs real published artifacts, builds the manual fallba
 and DKMS modules, and exercises cleanup without attaching host devices:
 
 ```bash
-dockpipe workflow validate workflows/quantum-cleanup-test/config.yml
-dockpipe --no-vault --no-compile-deps --workflow quantum-cleanup-test \
-  --var QUANTUM_CLEANUP_INPUT=/absolute/release-downloads \
-  --var QUANTUM_CLEANUP_EVIDENCE=/absolute/cleanup-evidence
+python3 -m unittest discover -s tests -v
+QUANTUM_CLEANUP_INPUT=/absolute/release-downloads \
+QUANTUM_CLEANUP_EVIDENCE=/absolute/cleanup-evidence \
+  bash scripts/maintenance/test-cleanup-matrix.sh
 ```
 
 The input directory must contain the published `quantum-<version>.tar.gz`, its
 `SHA256SUMS`, the revision-2 DEB, and `native-2-SHA256SUMS` from the same release.
-The DockPipe workflow runs unit tests and the Ubuntu 22.04/24.04 matrix. Its
-host-side wrapper starts Docker containers with read-only source/input mounts.
+The commands run unit tests and the Ubuntu 22.04/24.04 matrix. The
+host-side script starts Docker containers with read-only source/input mounts.
 The harness uses disposable container state, never mounts host `/lib/modules`,
 and never loads a module. Container success is installation/removal evidence;
 a VM can additionally test boot/initramfs behaviour, while audible output,

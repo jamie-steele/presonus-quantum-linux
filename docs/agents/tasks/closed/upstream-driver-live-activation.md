@@ -33,7 +33,7 @@ without losing the in-house rollback artifact.
 
 - `docs/agents/tasks/closed/upstream-driver-backend-integration.md` owns the completed
   external-source integration and dual-backend build evidence.
-- `notes/CURRENT_STATUS.md` owns the current live backend and desktop state.
+- `research/notes/CURRENT_STATUS.md` owns the current live backend and desktop state.
 - The installed in-house rollback SHA-256 is
   `d54f2bf411430c5ed350b5999d07795e9d7de6aa3801332c9e0d97152fa9b45e`.
 
@@ -153,7 +153,7 @@ without losing the in-house rollback artifact.
 ## Remaining Work
 
 - No remaining migration task. Known desktop-discovery and DMA/rate-transition
-  limitations remain in `notes/CURRENT_STATUS.md`. Diagnose a freshly reproduced
+  limitations remain in `research/notes/CURRENT_STATUS.md`. Diagnose a freshly reproduced
   upstream/integration problem when needed; do not resume this old activation plan.
 
 ## Closure Summary

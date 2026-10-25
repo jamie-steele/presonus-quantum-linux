@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Host-side DockPipe entry: never install packages or run cleanup on the host.
+# Never install packages or run cleanup on the host.
 set -Eeuo pipefail
 repository=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 input=${QUANTUM_CLEANUP_INPUT:?set QUANTUM_CLEANUP_INPUT to the downloaded release directory}

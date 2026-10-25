@@ -63,12 +63,12 @@ it is no longer the primary source for guessing standalone register meanings.
 
 ## Relevant Context
 
-- `notes/CURRENT_STATUS.md`: canonical current evidence; it now records confirmed TCI readiness,
+- `research/notes/CURRENT_STATUS.md`: canonical current evidence; it now records confirmed TCI readiness,
   stable bounded DMA, and audible stereo output.
 - `driver/snd-quantum2626.c`: the task started from experimental direct MMIO writes, a synthetic
   timer-driven pointer, stereo-only S16 constraints, and no TCI/mailbox model; those limitations are
   historical and have been replaced by the implementation validated below.
-- `notes/REGISTER_GUESSES.md` and `notes/GHIDRA_FINDINGS_SUMMARY.md`: Windows analysis recorded reads
+- `research/notes/REGISTER_GUESSES.md` and `research/notes/GHIDRA_FINDINGS_SUMMARY.md`: Windows analysis recorded reads
   at `0x10300` and `0x10304`; it did not prove that these offsets accept raw ALSA DMA addresses.
 - `docs/REVERSE_ENGINEERING_PLAN.md`: current plan is Windows-first and must be revised after the TCI
   contract is understood.
@@ -162,7 +162,7 @@ it is no longer the primary source for guessing standalone register meanings.
   a current official macOS installer; it does not copy vendor code.
 - The official installer contains a universal DriverKit extension, version 2.19.0, whose PCI match
   includes `0x01041c67`. Artifact hashes and the redistributable protocol notes are recorded in
-  `notes/TCI_PROTOCOL.md`; binaries and decompiler output remain outside the repository in `/tmp`.
+  `research/notes/TCI_PROTOCOL.md`; binaries and decompiler output remain outside the repository in `/tmp`.
 - **Static analysis:** TCI is an eight-byte-header message protocol over coherent TX/RX slot rings.
   The complete mailbox register map, producer/consumer ownership, lengths, and start/stop controls
   are now recovered.
@@ -203,8 +203,8 @@ it is no longer the primary source for guessing standalone register meanings.
 - Created this active task and registered it in `docs/agents/tasks/index.yml`.
 - Pre-task repository hygiene removed unused locals and an ignored speculative `STATUS5` pointer
   read. This does not implement or validate TCI.
-- Added `notes/TCI_PROTOCOL.md` and reconciled `notes/CURRENT_STATUS.md` and
-  `notes/REGISTER_GUESSES.md` with the macOS static analysis.
+- Added `research/notes/TCI_PROTOCOL.md` and reconciled `research/notes/CURRENT_STATUS.md` and
+  `research/notes/REGISTER_GUESSES.md` with the macOS static analysis.
 - Added `scripts/ghidra/ExportNamedFunctions.java` for selective symbol-based disassembly and
   decompilation to an explicitly caller-chosen output outside the repository.
 - Replaced speculative probe and fake PCM behavior with cohesive TCI ring/start/stop/control helpers,
@@ -370,7 +370,7 @@ it is no longer the primary source for guessing standalone register meanings.
   complete rate-dependent channel profiles. At 44.1/48 kHz playback is analog 1-8, S/PDIF 1-2,
   then ADAT 1-16; at 88.2/96 kHz ADAT contracts to 1-8; at 176.4/192 kHz only analog 1-8 remains.
   Capture uses the corresponding Mic/Instrument, Line, S/PDIF, and ADAT order. The proprietary
-  analysis product remains under `/tmp`; `notes/CHANNEL_ROUTING.md` contains only the sanitized
+  analysis product remains under `/tmp`; `research/notes/CHANNEL_ROUTING.md` contains only the sanitized
   resulting table.
 - **Implemented offline, unverified on hardware:** the new UCM profile exposes 13 stereo playback
   endpoints through one 48 kHz, 26-channel S32_LE `dshare` slave fixed to 128/256 frames. An isolated
