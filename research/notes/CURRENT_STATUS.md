@@ -4,6 +4,20 @@
 
 ## Current Repository Direction
 
+- **Offline issue-33 investigation, 2026-10-25:** the exact revision-2 UCM profile
+  exposes 39 mutually compatible devices. A bounded harness of PipeWire 1.6.2's
+  extracted profile-subset iterators reproduces exponential enumeration before
+  PCM probing (about 550 billion subset visits for this layout). This is the
+  leading candidate for the reporter's CPU/discovery stall, not a confirmed
+  runtime root cause. The newer journal confirms the service alias is corrected
+  and lacks Quantum timeout diagnostics. See [the focused analysis](UCM_DISCOVERY_HANG.md)
+  and [TASK-025](../../docs/agents/tasks/ucm-discovery-hang.md); no live test occurred.
+  A subsequent full `acp_card_new()` test with virtual UCM lookup and null PCM
+  transport confirms the search stall before any PCM open. A focused PipeWire
+  patch completes the same discovery with all 39 devices and preserves five
+  smaller compatibility layouts. The patch is prepared for review, not deployed;
+  the reporter's exact runtime root cause remains unconfirmed. Reproduction and
+  deployment limits are in [the patch README](../../packaging/pipewire/README.md).
 - Nicholas Johnson's [official RFC](https://lore.kernel.org/all/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/)
   `snd-quantum` is the main/default backend. It remains an RFC, not a claim of mainline merge.
 - [EMATech/quantum](https://github.com/EMATech/quantum) is an unofficial contributor
