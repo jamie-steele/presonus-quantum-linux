@@ -18,6 +18,9 @@
   smaller compatibility layouts. The patch is prepared for review, not deployed;
   the reporter's exact runtime root cause remains unconfirmed. Reproduction and
   deployment limits are in [the patch README](../../packaging/pipewire/README.md).
+  Native revision 4 now integrates the compiled correction through a private
+  ACP factory selected for Quantum PCI IDs after login/reboot. Local packaging
+  validation is separate from release publication and physical-audio acceptance.
 - Nicholas Johnson's [official RFC](https://lore.kernel.org/all/20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au/)
   `snd-quantum` is the main/default backend. It remains an RFC, not a claim of mainline merge.
 - [EMATech/quantum](https://github.com/EMATech/quantum) is an unofficial contributor

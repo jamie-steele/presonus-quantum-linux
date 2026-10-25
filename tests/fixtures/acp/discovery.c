@@ -20,6 +20,10 @@ int snd_use_case_mgr_open(snd_use_case_mgr_t **manager, const char *name)
 {
     int (*real_open)(snd_use_case_mgr_t **, const char *);
     real_open = dlsym(RTLD_NEXT, "snd_use_case_mgr_open");
+    if (!real_open) {
+        fprintf(stderr, "libasound UCM parser unavailable: %s\n", dlerror());
+        _exit(111);
+    }
     ucm_opens++;
     fprintf(stderr, "UCM lookup %s -> P2626\n", name);
     return real_open(manager, "P2626");
@@ -30,6 +34,10 @@ int snd_pcm_open(snd_pcm_t **pcm, const char *name, snd_pcm_stream_t stream, int
 {
     int (*real_open)(snd_pcm_t **, const char *, snd_pcm_stream_t, int);
     real_open = dlsym(RTLD_NEXT, "snd_pcm_open");
+    if (!real_open) {
+        fprintf(stderr, "libasound null transport unavailable: %s\n", dlerror());
+        _exit(111);
+    }
     pcm_opens++;
     fprintf(stderr, "PCM probe %u: %s -> null\n", pcm_opens, name);
     return real_open(pcm, "null", stream, mode);
@@ -66,6 +74,7 @@ static void deadline(int signal_number)
     _exit(124);
 }
 
+#ifndef ACP_SHIMS_ONLY
 int main(void)
 {
     struct acp_dict_item items[] = {
@@ -106,3 +115,4 @@ int main(void)
     acp_card_destroy(card);
     return 0;
 }
+#endif

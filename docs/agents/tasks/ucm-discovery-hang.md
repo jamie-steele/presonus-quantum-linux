@@ -55,4 +55,37 @@ discovery, without another blind reinstall or live hardware mutation.
 
 - Local reproduction and focused source fix are complete. Upstream review,
   submission, distro backport/deployment and reporter runtime confirmation are
-  pending. No public comment or patch was submitted.
+  pending. Repository PR #38 is merged; upstream submission is separate.
+
+## Native Delivery Follow-Up
+
+- User requested that package upgrades deliver the runtime correction after
+  PR #38 only retained the patch and reproduction harness.
+- Native revision 4 requires a compiled, checksum-verified private ACP plugin.
+  The build applies the pinned PipeWire 1.6.2 patch; a WirePlumber service drop-in
+  activates it after login/reboot. Quantum PCI IDs select the patched factory;
+  unrelated cards and ALSA factories delegate to the installed distro plugin.
+- Corresponding sources, licenses and private mixer data are included. Distro
+  libraries are not replaced. No live host installation or audio restart is
+  authorized or performed. Native publication remains a separate step.
+- Canonical package behavior and validation: `packaging/pipewire/README.md`.
+
+### Delivery Validation
+
+- Built revision-4 DEB plus Fedora/openSUSE RPMs and revision-5 upgrade fixtures
+  in a disposable Ubuntu 22.04 container. The plugin requires at most glibc 2.34,
+  within the enforced glibc 2.35/x86_64 baseline.
+- Real Ubuntu 22.04 package lifecycle passed: pre-fix revision 3 -> 4 upgrade,
+  installed-factory discovery, same-version reinstall, WirePlumber policy
+  trigger, revision 4 -> 5 upgrade, config preservation, and removal/purge.
+- The exact DEB payload also passed actual distro PipeWire-loader discovery on
+  Debian 13 and Ubuntu 26.04 with their ALSA UCM dependencies present. The
+  Ubuntu 26.04 runtime check matches the reporter's release; it does not add
+  full native distro/kernel lifecycle acceptance. All 39 Quantum mappings were
+  probed twice (direct SPA factory and PipeWire loader). Unrelated factories
+  retain distro pointers; PCI selector tests preserve unrelated/missing IDs.
+- All 60 Python tests and the original/fixed 12-case ACP regression matrix
+  passed; ShellCheck, YAML parsing and whitespace checks passed.
+- No host library/configuration, module, live service or sound device was changed.
+  No release publication or reporter hardware acceptance is claimed. Full native
+  distro lifecycle/repository coverage remains enforced by the CI matrix.

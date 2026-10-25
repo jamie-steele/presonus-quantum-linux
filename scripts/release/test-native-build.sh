@@ -6,13 +6,14 @@ bundle=${1:?source bundle directory required}
 output=${2:?output directory required}
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends python3 rpm dpkg-dev git ca-certificates file
+apt-get install -y --no-install-recommends python3 rpm dpkg-dev git ca-certificates file build-essential libasound2-dev
 work=$(mktemp -d)
 cd "$bundle"
 sha256sum -c SHA256SUMS
 tar -xzf quantum-*.tar.gz -C "$work"
 package=$(find "$work" -mindepth 1 -maxdepth 1 -type d -name 'quantum-*')
 git config --global --add safe.directory /workspace
+python3 /workspace/scripts/release/build_acp.py "$output/acp"
 revision=$(cat /workspace/packaging/native/revision)
-python3 /workspace/scripts/release/build_native.py "$package" "$output/native"
-python3 /workspace/scripts/release/build_native.py "$package" "$output/upgrade" --revision "$((revision + 1))"
+python3 /workspace/scripts/release/build_native.py "$package" "$output/native" --acp "$output/acp"
+python3 /workspace/scripts/release/build_native.py "$package" "$output/upgrade" --acp "$output/acp" --revision "$((revision + 1))"

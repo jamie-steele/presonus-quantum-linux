@@ -23,16 +23,16 @@ case "$family" in
             headers=linux-headers-generic
         fi
         apt-get install -y --no-install-recommends build-essential dkms kmod \
-            "$headers" python3 alsa-utils alsa-ucm-conf wireplumber initramfs-tools ca-certificates
+            "$headers" python3 libasound2-dev alsa-utils alsa-ucm-conf wireplumber initramfs-tools ca-certificates
         ;;
     fedora)
         dnf install -y gcc make dkms kernel-devel kernel-headers kmod python3 \
-            alsa-utils alsa-ucm alsa-ucm-utils wireplumber dracut findutils diffutils tar gzip
+            alsa-lib-devel alsa-utils alsa-ucm alsa-ucm-utils wireplumber dracut findutils diffutils tar gzip
         ;;
     opensuse)
         zypper --non-interactive refresh
         zypper --non-interactive install gcc make dkms kernel-default-devel \
-            kmod python3 alsa-utils alsa-ucm-conf wireplumber dracut findutils diffutils tar gzip
+            kmod python3 alsa-devel alsa-utils alsa-ucm-conf wireplumber dracut findutils diffutils tar gzip
         ;;
     arch)
         pacman -Syu --noconfirm --needed base-devel dkms linux-headers kmod python \

@@ -100,6 +100,27 @@ errors, install headers, and reinstall the package. Reboot when ready and verify
 `lspci -nnk` reports `snd_quantum`. Secure Boot still requires your distro's DKMS
 key enrollment. Installation success alone is not boot or audio acceptance.
 
+### Packaged discovery correction in revision 4
+
+Native revision 4 includes a compiled, private PipeWire ACP plugin to address
+the exponential UCM profile search reproduced for issue #33. The build applies
+the PipeWire patch and includes the resulting library, its mixer data and
+corresponding sources. WirePlumber's package-owned user-service drop-in selects
+it after the next login/reboot. Quantum PCI IDs use the corrected ACP code;
+other devices and factories continue through the distro plugin. Distro
+PipeWire files are not overwritten. See [the implementation and reproduction
+notes](../packaging/pipewire/README.md).
+
+Install/upgrade/removal does not restart audio. Reboot when ready so the user
+manager reloads the service configuration and processes stop using the previous
+library mappings. Custom WirePlumber units or SPA plugin paths need separate
+review. This integration is included in native DEB/RPM packages; the standalone
+source installer does not install the private plugin.
+
+Revision 4 is prepared locally and is not yet published. Hardware confirmation
+on the issue-33 reporter's machine remains pending. The release workflow must
+publish the tested revision before ordinary APT updates can deliver it.
+
 ### Automatic legacy migration in DEB revision 3
 
 Revision 3 is prepared for review; it is not yet published to the signed feed.
