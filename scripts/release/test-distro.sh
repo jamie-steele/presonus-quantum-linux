@@ -32,7 +32,7 @@ case "$family" in
     opensuse)
         zypper --non-interactive refresh
         zypper --non-interactive install gcc make dkms kernel-default-devel \
-            kmod python3 libasound2-dev alsa-utils alsa-ucm-conf wireplumber dracut findutils diffutils tar gzip
+            kmod python3 alsa-devel alsa-utils alsa-ucm-conf wireplumber dracut findutils diffutils tar gzip
         ;;
     arch)
         pacman -Syu --noconfirm --needed base-devel dkms linux-headers kmod python \
