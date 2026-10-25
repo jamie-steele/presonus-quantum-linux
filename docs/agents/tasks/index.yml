@@ -7,6 +7,14 @@ task_system:
   template: docs/agents/tasks/task-template.md
 
 tasks:
+  - id: TASK-025
+    title: Issue 33 UCM discovery hang investigation
+    path: docs/agents/tasks/ucm-discovery-hang.md
+    summary: Offline reproduction of exponential ACP enumeration for the shipped 39-device UCM layout; reporter confirmation remains pending.
+    status: active
+    load_when:
+      - investigating issue-33 whole-stack discovery stalls or high CPU
+      - reviewing UCM profile-generation complexity and upstream fix candidates
   - id: TASK-020
     title: WirePlumber native policy selection
     path: docs/agents/tasks/wireplumber-native-policy.md
