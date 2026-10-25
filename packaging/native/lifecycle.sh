@@ -1,6 +1,14 @@
 # Included in native package scripts; no module loads or service restarts.
 set -eu
 
+configure_wireplumber() {
+    python3 -B /usr/lib/quantum-dkms/wireplumber_policy.py configure
+}
+
+remove_wireplumber() {
+    python3 -B /usr/lib/quantum-dkms/wireplumber_policy.py remove
+}
+
 refresh_boot_images() {
     for modules in /lib/modules/*; do
         [ -d "$modules" ] || continue
@@ -36,6 +44,15 @@ configure_module() {
         [ -f "$modules/build/Makefile" ] || continue
         kernel=${modules##*/}
         dkms build -m quantum -v "$version" -k "$kernel"
+    done
+    # Build every replacement first. Old DKMS removal must precede the new
+    # install because both versions use the same unversioned module filename.
+    if [ -n "$migration_helper" ]; then
+        python3 -B "$migration_helper" "$version"
+    fi
+    for modules in /lib/modules/*; do
+        [ -f "$modules/build/Makefile" ] || continue
+        kernel=${modules##*/}
         # RFC modules are unversioned; a packaging upgrade must replace this
         # specific module even when its embedded MODULE_VERSION is unchanged.
         dkms install -m quantum -v "$version" -k "$kernel" --force

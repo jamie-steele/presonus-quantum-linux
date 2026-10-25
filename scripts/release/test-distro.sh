@@ -80,8 +80,7 @@ bash "$package/host-tools.sh" check
 if [[ -z "$native_dir" ]]; then
     bash "$package/host-tools.sh" wireplumber
 else
-    # Native packages install both policy formats and do not call the old tar
-    # installer's version probe. Validate the current helper independently.
+    # Validate the current version probe rather than the immutable tar helper.
     bash /workspace/driver/scripts/host-tools.sh wireplumber
 fi
 
@@ -96,6 +95,11 @@ dkms remove -m quantum -v "$version" --all
 
 if [[ -n "$native_dir" ]]; then
     bash /workspace/scripts/release/test-native.sh "$family" "$native_dir" "$upgrade_dir" "$kernel"
+    case "$family" in
+        ubuntu|debian)
+            bash /workspace/scripts/release/test-migration.sh "$package" "$native_dir" "$kernel"
+            ;;
+    esac
 else
     python3 /workspace/scripts/release/validate-audio.py "$package/alsa"
 fi

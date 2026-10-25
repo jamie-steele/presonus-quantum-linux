@@ -44,12 +44,14 @@ def stage(bundle, destination, version):
     config.write_text(updated)
     # Desktop integration belongs to the packaging revision, not the RFC pin.
     shutil.copytree(ROOT / "alsa/ucm2", destination / "usr/share/alsa/ucm2")
-    # Each WirePlumber generation reads only its own configuration directory.
-    for name, directory in (("51-quantum2626.lua", "main.lua.d"),
-                            ("51-quantum2626.conf", "wireplumber.conf.d")):
-        target = destination / "usr/share/wireplumber" / directory / name
+    # Keep inactive rules outside WirePlumber's deprecated-file scanner.
+    for name in ("51-quantum2626.lua", "51-quantum2626.conf"):
+        target = destination / "usr/share/quantum-dkms/wireplumber" / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / "alsa/wireplumber" / name, target)
+    target = destination / "usr/lib/quantum-dkms/wireplumber_policy.py"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / "packaging/native/wireplumber_policy.py", target)
     target = destination / "etc/modprobe.d/quantum2626-backend.conf"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(bundle / "quantum2626-backend.conf", target)
@@ -61,9 +63,11 @@ def stage(bundle, destination, version):
     shutil.copytree(bundle / "patches", documentation / "patches")
 
 
-def lifecycle(version, command):
+def lifecycle(version, command, migration=False):
     common = (ROOT / "packaging/native/lifecycle.sh").read_text()
-    return f'#!/bin/sh\nversion="{version}"\n' + common + "\n" + command + "\n"
+    helper = "/usr/lib/quantum-dkms/migrate_legacy.py" if migration else ""
+    return (f'#!/bin/sh\nversion="{version}"\nmigration_helper="{helper}"\n'
+            + common + "\n" + command + "\n")
 
 
 def build_deb(payload, output, version, environment):
@@ -74,7 +78,7 @@ Section: kernel
 Priority: optional
 Architecture: amd64
 Maintainer: PreSonus Quantum Linux contributors <jamie-steele@users.noreply.github.com>
-Depends: dkms (>= 2.8.7), build-essential, kmod, alsa-ucm-conf, wireplumber (>= 0.4), initramfs-tools
+Depends: dkms (>= 2.8.7), python3, build-essential, kmod, alsa-ucm-conf, wireplumber (>= 0.4), initramfs-tools
 Homepage: {HOMEPAGE}
 Description: Experimental PreSonus Quantum RFC driver and desktop audio profiles
  Nicholas Johnson's unmerged snd-quantum RFC, built locally through DKMS.
@@ -82,13 +86,32 @@ Description: Experimental PreSonus Quantum RFC driver and desktop audio profiles
  Matching kernel headers must be installed before configuring this package.
 """)
     write(control / "conffiles", "/etc/modprobe.d/quantum2626-backend.conf\n")
+    write(control / "triggers", "interest-noawait /usr/bin/wireplumber\n")
+    helper_dir = payload / "usr/lib/quantum-dkms"
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    for source, name in (
+        (ROOT / "scripts/maintenance/cleanup-ubuntu.py", "cleanup_state.py"),
+        (ROOT / "packaging/native/migrate_legacy.py", "migrate_legacy.py"),
+        (ROOT / "driver/modprobe.d/quantum2626-upstream.conf", "backend-upstream.conf"),
+    ):
+        shutil.copyfile(source, helper_dir / name)
+    identity = hashlib.sha256((ROOT / "driver/modprobe.d/quantum2626-inhouse.conf").read_bytes()).hexdigest()
+    write(helper_dir / "migration-identities.json", json.dumps({"inhouse_policy_sha256": identity}) + "\n")
+    preinst = (ROOT / "packaging/native/preinst.sh").read_text().replace("@INHOUSE_SHA256@", identity)
+    write(control / "preinst", preinst, executable=True)
     scripts = {
-        "postinst": 'case "${1:-}" in configure) configure_module ;; esac',
-        "prerm": 'case "${1:-}" in remove|upgrade|deconfigure) remove_module ;; esac',
+        "postinst": '''case "${1:-}" in
+    configure) configure_module; configure_wireplumber ;;
+    triggered) configure_wireplumber ;;
+esac''',
+        "prerm": '''case "${1:-}" in
+    remove|deconfigure) remove_wireplumber; remove_module ;;
+    upgrade) remove_module ;;
+esac''',
         "postrm": 'case "${1:-}" in remove|purge) refresh_boot_images ;; esac',
     }
     for name, command in scripts.items():
-        write(control / name, lifecycle(version, command), executable=True)
+        write(control / name, lifecycle(version, command, migration=(name == "postinst")), executable=True)
     subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(payload),
                     str(output / f"quantum-dkms_{version}_amd64.deb")],
                    check=True, env=environment)
@@ -105,6 +128,8 @@ def build_rpm(payload, output, upstream, revision, family, work, environment):
         name = "/" + str(path.relative_to(payload))
         if path.is_dir() and (name.startswith(f"/usr/src/quantum-{version}")
                               or name.startswith("/usr/share/doc/quantum-dkms")
+                              or name.startswith("/usr/share/quantum-dkms")
+                              or name.startswith("/usr/lib/quantum-dkms")
                               or name == "/usr/share/alsa/ucm2/P2626"):
             files.append("%dir " + name)
         elif path.is_file():
@@ -118,7 +143,7 @@ Summary: Experimental PreSonus Quantum RFC driver and desktop audio profiles
 License: GPL-2.0-only AND MIT
 URL: {HOMEPAGE}
 BuildArch: x86_64
-Requires: dkms >= 3, gcc, make, kmod, {dependencies}, wireplumber >= 0.4, dracut
+Requires: dkms >= 3, gcc, make, kmod, python3, {dependencies}, wireplumber >= 0.4, dracut
 Requires(preun): dkms
 Requires(post): dkms
 AutoReqProv: no
@@ -135,12 +160,19 @@ cp -a {payload}/. %{{buildroot}}/
 %post
 {common}
 configure_module
+configure_wireplumber
+
+%transfiletriggerin -- /usr/bin/wireplumber /usr/share/quantum-dkms/wireplumber
+python3 -B /usr/lib/quantum-dkms/wireplumber_policy.py configure
 
 %preun
 {common}
 # On same-version reinstall the new instance uses the same DKMS registration.
 if [ "${{1:-0}}" = 0 ] || rpm -q --queryformat '%%{{VERSION}}-%%{{RELEASE}}\\n' quantum-dkms | grep -Fxv '{upstream}-{release}' >/dev/null; then
     remove_module
+fi
+if [ "${{1:-0}}" = 0 ]; then
+    remove_wireplumber
 fi
 
 %postun

@@ -13,8 +13,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: quantum-apt-pages
-  cancel-in-progress: false
+  # Ineligible workflow_run events must not cancel an authorized publication.
+  group: >-
+    quantum-apt-pages-${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+        github.event.workflow_run.head_repository.full_name == github.repository)) &&
+      'publish' || github.run_id }}
+  # Each run rebuilds the complete feed. Supersede a stuck deployment so it cannot
+  # hold all later renewals past Valid-Until (issue #29).
+  cancel-in-progress: true
 
 jobs:
   repository:
@@ -26,6 +35,7 @@ jobs:
         github.event.workflow_run.head_repository.full_name == github.repository)) &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: apt-signing
     steps:
       - uses: actions/checkout@v4
@@ -62,7 +72,9 @@ jobs:
   deploy:
     needs: repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -71,3 +83,23 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Verify deployed signatures and renewal headroom
+        env:
+          BASE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..6}; do
+            if python3 scripts/release/apt_repository.py verify "$BASE_URL"; then
+              exit 0
+            fi
+            if [[ "$attempt" -lt 6 ]]; then
+              sleep 10
+            fi
+          done
+          echo 'Published APT feed failed signature or freshness verification.' >&2
+          exit 1

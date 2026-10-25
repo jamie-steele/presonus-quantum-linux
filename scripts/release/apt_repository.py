@@ -3,6 +3,8 @@
 
 import argparse
 import datetime
+from email.parser import Parser
+from email.utils import parsedate_to_datetime
 import gzip
 import hashlib
 import json
@@ -10,7 +12,9 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 from urllib.parse import urlparse
+from urllib.request import urlopen
 
 
 def run(arguments, **kwargs):
@@ -51,6 +55,58 @@ def download_packages(repository, destination):
             package = download / package_name
             if hashlib.sha256(package.read_bytes()).hexdigest() != expected:
                 raise ValueError(f"Package checksum mismatch: {tag}/{package_name}")
+
+
+def check_freshness(metadata, now=None):
+    """Require enough signed validity for recovery before clients stop updating."""
+    fields = Parser().parsestr(metadata)
+    timestamps = {}
+    for field in ("Date", "Valid-Until"):
+        values = fields.get_all(field, [])
+        if len(values) != 1:
+            raise ValueError(f"Expected one signed {field} field")
+        timestamp = parsedate_to_datetime(values[0])
+        if timestamp.tzinfo is None:
+            raise ValueError(f"Signed {field} must include a timezone")
+        timestamps[field] = timestamp
+    if now is None:
+        now = datetime.datetime.now(datetime.timezone.utc)
+    if timestamps["Date"] > now + datetime.timedelta(minutes=10):
+        raise ValueError("Signed APT metadata is dated in the future")
+    if timestamps["Valid-Until"] <= timestamps["Date"]:
+        raise ValueError("Signed APT metadata has an invalid validity interval")
+    if timestamps["Valid-Until"] <= now + datetime.timedelta(days=7):
+        raise ValueError("Signed APT metadata has seven days or less remaining; renew publication")
+    return timestamps["Valid-Until"]
+
+
+def verify(base_url):
+    """Read back the live feed using the public signing key retained in Git."""
+    url = urlparse(base_url)
+    if url.scheme != "https" or not url.netloc or url.query or url.fragment:
+        raise ValueError("APT base URL must be an HTTPS URL without query or fragment")
+    public_key = Path(__file__).resolve().parents[2] / "packaging/native/apt-signing-key.asc"
+    with tempfile.TemporaryDirectory(prefix="quantum-apt-verify-") as temporary:
+        root = Path(temporary)
+        keyring = root / "keyring.gpg"
+        subprocess.run([
+            "gpg", "--batch", "--homedir", str(root), "--dearmor",
+            "--output", str(keyring), str(public_key),
+        ], check=True)
+        metadata_url = base_url.rstrip("/") + "/dists/experimental/InRelease"
+        with urlopen(metadata_url, timeout=30) as response:
+            signed = response.read(1024 * 1024 + 1)
+        if len(signed) > 1024 * 1024:
+            raise ValueError("Published InRelease exceeds the metadata size limit")
+        inrelease = root / "InRelease"
+        inrelease.write_bytes(signed)
+        verified = root / "Release"
+        subprocess.run([
+            "gpgv", "--homedir", str(root), "--keyring", str(keyring),
+            "--output", str(verified), str(inrelease),
+        ], check=True)
+        expiry = check_freshness(verified.read_text(encoding="utf-8"))
+        print(f"PASS: published APT signature verified; valid until {expiry.isoformat()}")
 
 
 def build(packages, output, fingerprint, base_url):
@@ -144,9 +200,13 @@ if __name__ == "__main__":
     generate.add_argument("output", type=Path)
     generate.add_argument("--fingerprint", required=True)
     generate.add_argument("--base-url", required=True)
+    health = commands.add_parser("verify")
+    health.add_argument("base_url")
     arguments = parser.parse_args()
     if arguments.command == "download":
         download_packages(arguments.repository, arguments.destination)
+    elif arguments.command == "verify":
+        verify(arguments.base_url)
     else:
         build(arguments.packages.resolve(), arguments.output.resolve(),
               arguments.fingerprint, arguments.base_url)
