@@ -175,3 +175,21 @@ A separate container syscall trace shows no successful sound-device opens and
 no ioctls. The authoritative final evidence is under
 `/tmp/quantum33-full-acp/container-evidence/quantum-full-acp-vkab874k` and
 `/tmp/quantum33-full-acp/container-evidence/container-syscalls.log`.
+
+## Native Packaging Follow-Up
+
+PR #38 retained the source patch and tests but did not apply the fix to installed
+PipeWire. Native revision 4 adds a required build artifact containing the
+patched ACP SPA factory, private mixer data, source archive and licenses.
+WirePlumber's packaged service environment selects the private plugin after
+login/reboot. The router uses the patched factory only for Quantum PCI IDs;
+all other cards and ALSA factories use the installed distro implementation.
+The build keeps internal ACP symbols hidden so the implementations cannot
+interpose on each other's internal calls.
+
+The installed-factory test exercises real distro PipeWire plugin loading with
+the package's exact `SPA_PLUGIN_DIR`, plus the existing synthetic UCM/null PCM
+boundaries. This verifies delivery of the algorithm fix without asserting
+actual Quantum transport or the reporter's runtime cause. Release publication
+and hardware acceptance remain separate. See the [package integration
+contract](../../packaging/pipewire/README.md) for activation and removal.

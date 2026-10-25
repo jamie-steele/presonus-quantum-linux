@@ -55,9 +55,14 @@ jobs:
           fi
           (cd bundle && sha256sum -c SHA256SUMS)
           tar -xzf "bundle/quantum-${TAG#rfc-}.tar.gz" -C extracted
+          docker build -t quantum-acp-build tests/fixtures/acp
+          mkdir acp-build
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/workspace:ro" -v "$PWD/acp-build:/output" \
+            quantum-acp-build python3 /workspace/scripts/release/build_acp.py /output/runtime
           revision=$(cat packaging/native/revision)
-          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" native
-          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" upgrade --revision "$((revision + 1))"
+          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" native --acp acp-build/runtime
+          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" upgrade --acp acp-build/runtime --revision "$((revision + 1))"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:

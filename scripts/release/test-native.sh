@@ -35,6 +35,27 @@ check_installed() {
         test -L /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
     fi
     python3 /workspace/scripts/release/validate-audio.py /usr/share/alsa
+    # Minimal distro containers may exclude /usr/share/doc during unpacking.
+    # Extract only the test headers from the exact package being validated.
+    local test_source archive
+    test_source=$(mktemp -d)
+    archive=usr/share/doc/quantum-dkms/acp/source/pipewire-1.6.2.tar.gz
+    case "$family" in
+        ubuntu|debian)
+            local package_file="$packages/quantum-dkms_${version}_amd64.deb"
+            [[ -f "$package_file" ]] || package_file="$upgrade/quantum-dkms_${version}_amd64.deb"
+            dpkg-deb --fsys-tarfile "$package_file" | tar -x -C "$test_source" "./$archive"
+            ;;
+        fedora|opensuse)
+            local suffix=fc43
+            [[ "$family" == fedora ]] || suffix=suse
+            local package_file="$packages/quantum-dkms-${version}.$suffix.x86_64.rpm"
+            [[ -f "$package_file" ]] || package_file="$upgrade/quantum-dkms-${version}.$suffix.x86_64.rpm"
+            (cd "$test_source"; rpm2cpio "$package_file" | cpio -id --quiet "./$archive")
+            ;;
+    esac
+    bash /workspace/scripts/release/test-packaged-acp.sh "$test_source/$archive"
+    rm -rf "$test_source"
 }
 
 old_version=$(python3 -c 'import json,glob,sys; print(json.load(open(glob.glob(sys.argv[1]+"/native-*-manifest.json")[0]))["native_version"])' "$packages")
@@ -78,5 +99,7 @@ esac
 test ! -e /usr/share/alsa/ucm2/P2626/HiFi.conf
 test ! -L /usr/share/wireplumber/main.lua.d/51-quantum2626.lua
 test ! -L /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
+test ! -e /usr/lib/quantum-dkms/spa-0.2/alsa/libspa-alsa.so
+test ! -e /usr/lib/systemd/user/wireplumber.service.d/51-quantum-acp.conf
 test ! -e /usr/src/quantum-"$new_version"
 echo 'PASS: native install, reinstall, packaging-revision upgrade, config preservation, and removal.'
