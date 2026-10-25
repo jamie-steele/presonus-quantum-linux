@@ -21,8 +21,8 @@ generation, including after a WirePlumber package upgrade.
 - Preserve unexpected links and custom rules. Only exact legacy template
   copies and links to the private packaged templates are replaced automatically.
 - Extend the existing pre-unpack backup to preserve managed symlinks and their
-  template contents. Keep the unrelated migration work and unpublished revision
-  3 intact; do not alter the RFC driver.
+  template contents. Preserve compatibility with the existing revision-3
+  migration backups; do not alter the RFC driver.
 - Never restart services, open a PCM, load modules, or infer that this warning
   explains the separate slowdown and missing-device report in issue #33.
 
@@ -57,5 +57,9 @@ generation, including after a WirePlumber package upgrade.
 
 ## Remaining Work
 
-- Local implementation and focused validation are complete. Commit, PR, merge, publication, public issue
-  updates, and live audio tests have not been performed for this objective.
+- Local implementation and focused validation are complete. The isolated PR
+  targets current master and includes only issue-35 changes. All 57 Python tests
+  pass again in that clean checkout. Published release assets still stop at
+  revision 2, so the pending revision-3 version remains appropriate.
+- Merge, publication, public issue updates, and live audio tests remain separate
+  follow-up operations.
