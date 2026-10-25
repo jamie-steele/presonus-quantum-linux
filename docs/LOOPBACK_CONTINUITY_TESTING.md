@@ -81,10 +81,10 @@ recovery:
 
 ```bash
 cd /home/jamie/source/Quantum2626
-python3 -m py_compile scripts/quantum2626_loopback_soak.py
-python3 scripts/quantum2626_loopback_soak.py self-test
-python3 scripts/quantum2626_loopback_soak.py self-test --transport pipewire
-python3 scripts/quantum2626_loopback_soak.py self-test --transport alsa
+python3 -m py_compile scripts/linux/quantum2626_loopback_soak.py
+python3 scripts/linux/quantum2626_loopback_soak.py self-test
+python3 scripts/linux/quantum2626_loopback_soak.py self-test --transport pipewire
+python3 scripts/linux/quantum2626_loopback_soak.py self-test --transport alsa
 ```
 
 Expected distinguishing output includes:
@@ -98,7 +98,7 @@ the log sequence, capture names, uniqueness, and exact block size, but creates o
 the artifact directory:
 
 ```bash
-python3 scripts/quantum2626_loopback_soak.py replay \
+python3 scripts/linux/quantum2626_loopback_soak.py replay \
   --artifact-dir /tmp/quantum2626-loopback-overnight-corrected-20260818-2
 ```
 
@@ -110,7 +110,7 @@ the adaptive lock threshold; it is retained as genuinely unclassifiable captured
 currently connected Digimax/ADAT return, use:
 
 ```bash
-python3 scripts/quantum2626_loopback_soak.py inspect \
+python3 scripts/linux/quantum2626_loopback_soak.py inspect \
   --capture-fragment quantum2626_mono_in_P2626_0_10__source
 ```
 
@@ -125,7 +125,7 @@ in place and that exact action is approved.
 Use a new output directory; the harness refuses to overwrite one:
 
 ```bash
-python3 scripts/quantum2626_loopback_soak.py run \
+python3 scripts/linux/quantum2626_loopback_soak.py run \
   --duration 05:00 \
   --rate 44100 \
   --output-dir /tmp/quantum2626-loopback-calibration \
@@ -176,7 +176,7 @@ summary and the physical level. The long run is a second live boundary.
 After the short run passes, use a fresh output directory:
 
 ```bash
-python3 scripts/quantum2626_loopback_soak.py run \
+python3 scripts/linux/quantum2626_loopback_soak.py run \
   --duration 08:00:00 \
   --output-dir /tmp/quantum2626-loopback-overnight \
   --level-dbfs -30 \
@@ -272,4 +272,4 @@ For the PipeWire discriminator, interpret the structured scheduling and ERR evid
 
 Retain the generated directory until its summary and any events have been classified. Do not commit
 raw event audio or host-specific telemetry to the repository. Record only sanitized conclusions in
-`notes/CURRENT_STATUS.md` and the active task.
+`research/notes/CURRENT_STATUS.md` and the active task.

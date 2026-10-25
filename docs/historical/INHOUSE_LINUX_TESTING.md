@@ -21,7 +21,7 @@ sudo insmod snd-quantum2626.ko dump_on_trigger=1
 
 # 3. Check status
 dmesg | tail -30
-../scripts/linux_test_driver.sh
+../scripts/linux/linux_test_driver.sh
 
 # 4. Check LED
 # Blue LED should be SOLID if initialized correctly
@@ -180,7 +180,7 @@ dmesg | grep "MMIO+0x100"
 
 ## Step 7: Compare with Windows Baseline
 
-**From Windows baseline (`notes/MMIO_BASELINE.md`):**
+**From Windows baseline (`research/notes/MMIO_BASELINE.md`):**
 - Register 0x00: Should be 0x00000000 (or device ID)
 - Register 0x04: Should be 0x01030060 (status/ID)
 - Register 0x08: Should be 0x00000010

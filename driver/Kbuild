@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+ifeq ($(QUANTUM_DRIVER),inhouse)
+include $(src)/inhouse/Kbuild
+else
+obj-m := snd-quantum.o
+snd-quantum-y := \
+	.upstream-src/quantum_main.o \
+	.upstream-src/quantum_dma.o \
+	.upstream-src/quantum_midi.o \
+	.upstream-src/quantum_mixer.o \
+	.upstream-src/quantum_pcm.o \
+	.upstream-src/quantum_tci.o
+endif

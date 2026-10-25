@@ -60,12 +60,12 @@ Replace the direct-ALSA loopback harness's three oversized kernel-pipe dependenc
 
 ## Validation
 
-- `python3 -m py_compile scripts/quantum2626_loopback_soak.py` — pass.
-- `python3 scripts/quantum2626_loopback_soak.py self-test` — pass with exact 1 MiB direct-ALSA
+- `python3 -m py_compile scripts/linux/quantum2626_loopback_soak.py` — pass.
+- `python3 scripts/linux/quantum2626_loopback_soak.py self-test` — pass with exact 1 MiB direct-ALSA
   playback/capture rings and native 64 KiB surrounding pipes.
-- `python3 scripts/quantum2626_loopback_soak.py self-test --transport pipewire` — pass; unchanged
+- `python3 scripts/linux/quantum2626_loopback_soak.py self-test --transport pipewire` — pass; unchanged
   PipeWire userspace capture isolation remains exact.
-- `python3 scripts/quantum2626_loopback_soak.py self-test --transport alsa` — pass; 44.1/48-kHz
+- `python3 scripts/linux/quantum2626_loopback_soak.py self-test --transport alsa` — pass; 44.1/48-kHz
   commands, geometry, capacity, byte preservation, and margins are exact.
 - Read-only replay of all 29 retained TASK-006 captures — pass with nine globally locked phase
   jumps and twenty globally reacquired correlation drops.

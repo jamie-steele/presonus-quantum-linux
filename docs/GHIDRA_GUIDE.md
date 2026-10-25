@@ -18,7 +18,7 @@
 ### 1. Launch Ghidra
 
 ```powershell
-.\scripts\ghidra_analyze_driver.ps1
+.\scripts\ghidra\ghidra_analyze_driver.ps1
 ```
 
 ### 2. Create/Open Project
@@ -341,7 +341,7 @@ Based on typical audio drivers:
 
 After finding register offsets:
 
-1. Document in `notes/REGISTER_GUESSES.md`
+1. Document in `research/notes/REGISTER_GUESSES.md`
 2. Test on Linux using `snd-quantum2626` module
 3. Compare with Windows behavior (see `docs/WINDOWS_REGISTER_MONITORING.md`)
 4. Iterate and refine based on testing results
@@ -349,10 +349,10 @@ After finding register offsets:
 ## Documentation Files
 
 - **This Guide:** `docs/GHIDRA_GUIDE.md` - Complete analysis guide
-- **Register Map:** `notes/REGISTER_GUESSES.md` - Register offset table
-- **Session Notes:** `notes/GHIDRA_ANALYSIS_SESSION.md` - Detailed session logs
-- **Findings:** `notes/GHIDRA_FINDINGS_SUMMARY.md` - Summary of confirmed findings
-- **Analysis Outputs:** `notes/analysis/ghidra_outputs/` - Script output files
+- **Register Map:** `research/notes/REGISTER_GUESSES.md` - Register offset table
+- **Session Notes:** `research/notes/GHIDRA_ANALYSIS_SESSION.md` - Detailed session logs
+- **Findings:** `research/notes/GHIDRA_FINDINGS_SUMMARY.md` - Summary of confirmed findings
+- **Analysis Outputs:** `research/notes/analysis/ghidra_outputs/` - Script output files
 
 ## Resources
 

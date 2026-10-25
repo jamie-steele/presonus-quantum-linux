@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Shared by the native build and the disposable migration fixture.
+obj-m := snd-quantum2626.o
+snd-quantum2626-y := \
+	inhouse/pci.o \
+	inhouse/rates.o \
+	inhouse/tci.o \
+	inhouse/dma.o \
+	inhouse/pcm.o \
+	inhouse/irq.o

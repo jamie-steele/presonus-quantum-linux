@@ -1,7 +1,7 @@
 # No sound diagnostics
 
 Start with [the current testing guide](LINUX_TESTING.md) and
-[current evidence](../notes/CURRENT_STATUS.md). The default driver is
+[current evidence](../research/notes/CURRENT_STATUS.md). The default driver is
 `snd-quantum`; old `snd-quantum2626` register parameters do not apply to it.
 
 1. Inspect `lspci -nnk -d 1c67:0104` and `/proc/asound/cards`. No PCI function

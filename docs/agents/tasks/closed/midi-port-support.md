@@ -43,7 +43,7 @@ prove byte-correct bidirectional operation without regressing the live-proven PC
   implementation.
 - `docs/agents/tasks/closed/tci-mailbox-macos-trace-pivot.md` owns the recovered vendor TCI mailbox model
   and is the first reference if MIDI is multiplexed through that control transport.
-- `notes/CURRENT_STATUS.md` owns the current live hardware and audio baseline.
+- `research/notes/CURRENT_STATUS.md` owns the current live hardware and audio baseline.
 - `docs/agents/reverse-engineering.md` and `docs/agents/hardware-testing.md` govern vendor analysis
   and live device experiments.
 - Public tracking issue: `https://github.com/jamie-steele/presonus-quantum-linux/issues/16`.

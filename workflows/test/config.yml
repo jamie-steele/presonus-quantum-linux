@@ -1,0 +1,6 @@
+name: test
+description: Run the existing offline Python tooling tests.
+steps:
+  - id: test
+    kind: host
+    cmd: python3 -m unittest discover -s tests -v

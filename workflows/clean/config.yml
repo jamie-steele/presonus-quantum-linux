@@ -1,0 +1,6 @@
+name: clean
+description: Clean driver build artifacts using the native Makefile.
+steps:
+  - id: clean
+    kind: host
+    cmd: make -C driver clean

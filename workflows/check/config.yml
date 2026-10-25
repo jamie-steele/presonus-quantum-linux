@@ -1,0 +1,6 @@
+name: check
+description: Verify the cached upstream source against the repository pin.
+steps:
+  - id: check
+    kind: host
+    cmd: make -C driver upstream-verify

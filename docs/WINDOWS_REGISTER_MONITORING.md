@@ -109,7 +109,7 @@ From the traces, we should be able to identify:
 ## Next Steps After Capture
 
 1. **Analyze traces** in WPA to extract register patterns
-2. **Document findings** in `notes/REGISTER_GUESSES.md`
+2. **Document findings** in `research/notes/REGISTER_GUESSES.md`
 3. **Implement in Linux driver** using discovered register map
 4. **Test and refine** using Linux feedback loop tools
 

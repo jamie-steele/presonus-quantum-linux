@@ -7,7 +7,7 @@ task_system:
   template: docs/agents/tasks/task-template.md
 
 # Legacy implementation and migration work is completed or superseded by upstream.
-# Known limitations remain in notes/CURRENT_STATUS.md; they are not automatic tasks.
+# Known limitations remain in research/notes/CURRENT_STATUS.md; they are not automatic tasks.
 tasks: []
 
 archives:

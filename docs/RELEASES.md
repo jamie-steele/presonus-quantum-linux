@@ -343,4 +343,4 @@ and validates staged integration. It does not prove boot, initramfs inclusion,
 Secure Boot enrollment, Thunderbolt enumeration, or physical audio on those distros.
 VM boot tests can extend that evidence, but emulated machines without the interface
 cannot validate its DMA/audio path. Known upstream rate-transition and discovery
-failures remain in `notes/CURRENT_STATUS.md`; every RFC release is experimental.
+failures remain in `research/notes/CURRENT_STATUS.md`; every RFC release is experimental.
