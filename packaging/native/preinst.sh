@@ -21,6 +21,8 @@ check_parents() {
 
 backup=''
 for path in \
+    /usr/share/quantum-dkms/wireplumber/51-quantum2626.lua \
+    /usr/share/quantum-dkms/wireplumber/51-quantum2626.conf \
     /usr/share/alsa/ucm2/P2626/P2626.conf \
     /usr/share/alsa/ucm2/P2626/HiFi.conf \
     /usr/share/alsa/ucm2/conf.d/snd-quantum/snd-quantum.conf \
@@ -32,7 +34,19 @@ for path in \
         continue
     fi
     check_parents "${path%/*}"
-    if [ -L "$path" ] || [ ! -f "$path" ]; then
+    managed_link=false
+    if [ -L "$path" ]; then
+        case "$path" in
+            /usr/share/wireplumber/main.lua.d/51-quantum2626.lua|/usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf)
+                target="/usr/share/quantum-dkms/wireplumber/${path##*/}"
+                check_parents "${target%/*}"
+                if [ "$(readlink "$path")" = "$target" ] && [ ! -L "$target" ] && [ -f "$target" ]; then
+                    managed_link=true
+                fi
+                ;;
+        esac
+    fi
+    if { [ -L "$path" ] && [ "$managed_link" = false ]; } || [ ! -f "$path" ]; then
         echo "Quantum migration stopped: inspect non-regular profile $path" >&2
         exit 1
     fi
@@ -44,8 +58,12 @@ for path in \
         echo "Quantum pre-install backup: $backup"
     fi
     mkdir -p "$backup/files${path%/*}"
-    cp -p "$path" "$backup/files$path"
-    sha256sum "$path" >> "$backup/SHA256SUMS"
+    cp -Pp "$path" "$backup/files$path"
+    if [ "$managed_link" = true ]; then
+        printf '%s -> %s\n' "$path" "$target" >> "$backup/SYMLINKS"
+    else
+        sha256sum "$path" >> "$backup/SHA256SUMS"
+    fi
 done
 
 # A manual in-house install left a conffile that blocks the incoming backend.

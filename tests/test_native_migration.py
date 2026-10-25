@@ -168,6 +168,28 @@ class NativeMigrationTests(unittest.TestCase):
         for command in ("modprobe", "rmmod", "systemctl", "service"):
             self.assertNotRegex(text, rf"(?m)^\s*{command}\s")
 
+    def test_preinst_preserves_managed_link_and_backs_up_template_before_upgrade(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            template = self.write(root, "usr/share/quantum-dkms/wireplumber/51-quantum2626.conf",
+                                  "packaged template\n")
+            link = root / "usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf"
+            link.parent.mkdir(parents=True)
+            link.symlink_to(template)
+            script = (ROOT / "packaging/native/preinst.sh").read_text()
+            for prefix in ("/usr/share/", "/etc/", "/var/backups/"):
+                script = script.replace(prefix, str(root) + prefix)
+            result = subprocess.run(["sh", "-s", "--", "upgrade"], input=script,
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(link.is_symlink())
+            backup = next((root / "var/backups/quantum-migration").iterdir())
+            saved_template = backup / "files" / str(template).lstrip("/")
+            saved_link = backup / "files" / str(link).lstrip("/")
+            self.assertEqual(saved_template.read_text(), "packaged template\n")
+            self.assertEqual(saved_link.readlink(), template)
+            self.assertIn(str(link), (backup / "SYMLINKS").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,7 +59,12 @@ alsa/wireplumber/51-quantum2626.conf
   -> /usr/share/wireplumber/wireplumber.conf.d/51-quantum2626.conf
 ```
 
-Only the rule matching the target WirePlumber series is installed. WirePlumber
+The source installer installs only the rule matching the target WirePlumber series.
+Native packages store both templates under `/usr/share/quantum-dkms/wireplumber/`
+and link only the matching rule into the search paths above. DEB file triggers
+and RPM transaction file triggers reselect it when WirePlumber is upgraded.
+Removal deletes only links pointing to the packaged templates; unexpected custom
+rules are preserved and reported for review during configuration. WirePlumber
 0.5 no longer loads Lua configuration; see its
 [migration guide](https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/migration.html).
 Future upstream profile submission is described in [CONTRIBUTING.md](../CONTRIBUTING.md).
