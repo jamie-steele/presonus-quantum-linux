@@ -116,6 +116,9 @@ The reporter's forced 1024-frame PipeWire graph quantum is a separate variable.
 Package installation does not restart audio. The corrected policy applies after
 WirePlumber next starts. User-level Quantum policy overrides are preserved and
 can shadow the packaged correction; compare any such override before testing.
+Unmodified policies left by the published source installer are recognized by
+their exact hashes and migrated to the corrected packaged rule. Edited policies
+remain protected, and DEB pre-installation backups retain the previous files.
 
 Revision 5 publication and signed-APT delivery must be verified before asking
 users to upgrade. Offline matching checks do not establish audible acceptance.

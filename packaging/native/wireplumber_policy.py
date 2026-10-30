@@ -2,6 +2,7 @@
 """Select packaged Quantum policy without starting WirePlumber or opening audio."""
 
 from pathlib import Path
+import hashlib
 import os
 import re
 import subprocess
@@ -12,6 +13,13 @@ import tempfile
 POLICIES = {
     "0.4": ("main.lua.d", "51-quantum2626.lua"),
     "0.5": ("wireplumber.conf.d", "51-quantum2626.conf"),
+}
+
+# Exact unmodified policies from the immutable rfc-20260820.rfc1.s1148921
+# source installer and native revisions through 4. Edited files stay protected.
+LEGACY_POLICY_SHA256 = {
+    "51-quantum2626.lua": "4fae5455807381f6ecc310c4cd94f75aff4b57b00894da3f05f77a38e8eb5486",
+    "51-quantum2626.conf": "6ef9ac43d2f9e548e7a59625d6fda5513944ba7db3f64ffbedd0db246af3ab8f",
 }
 
 
@@ -65,7 +73,11 @@ def select_policy(root, series=None, remove=False):
             if not owned_link:
                 raise ValueError(f"Preserved unexpected policy symlink: {destination}")
         elif destination.exists():
-            if not destination.is_file() or destination.read_bytes() != source.read_bytes():
+            if not destination.is_file():
+                raise ValueError(f"Preserved customized policy; review before retrying: {destination}")
+            content = destination.read_bytes()
+            known_legacy = hashlib.sha256(content).hexdigest() == LEGACY_POLICY_SHA256[name]
+            if content != source.read_bytes() and not known_legacy:
                 raise ValueError(f"Preserved customized policy; review before retrying: {destination}")
 
         if policy_series == series:
