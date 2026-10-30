@@ -100,6 +100,26 @@ errors, install headers, and reinstall the package. Reboot when ready and verify
 `lspci -nnk` reports `snd_quantum`. Secure Boot still requires your distro's DKMS
 key enrollment. Installation success alone is not boot or audio acceptance.
 
+### Quantum endpoint buffering correction in revision 5
+
+Native revision 5 fixes the WirePlumber 0.4/0.5 buffering rules, which matched
+older PCM-derived endpoint names but missed ACP's UCM device names such as
+`HiFi__Speaker__sink` and `HiFi__LineInput5__source`. Each rule now checks the
+Quantum driver and HiFi direction, covering both naming layouts and both driver
+backends without changing other cards. Playback requests 128-frame periods,
+four periods per buffer, and 256 frames of headroom; capture retains 128/four
+without additional headroom. The kernel RFC and UCM routing are unchanged.
+
+This corrects policy selection; it is not a confirmed fix for the silence or
+periodic buzzing reported after device discovery recovered in issue #33.
+The reporter's forced 1024-frame PipeWire graph quantum is a separate variable.
+Package installation does not restart audio. The corrected policy applies after
+WirePlumber next starts. User-level Quantum policy overrides are preserved and
+can shadow the packaged correction; compare any such override before testing.
+
+Revision 5 publication and signed-APT delivery must be verified before asking
+users to upgrade. Offline matching checks do not establish audible acceptance.
+
 ### Packaged discovery correction in revision 4
 
 Native revision 4 includes a compiled, private PipeWire ACP plugin to address

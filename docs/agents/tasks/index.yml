@@ -7,6 +7,14 @@ task_system:
   template: docs/agents/tasks/task-template.md
 
 tasks:
+  - id: TASK-026
+    title: Quantum endpoint buffering policy correction
+    path: docs/agents/tasks/endpoint-buffering-policy.md
+    summary: Correct Quantum endpoint matching in WirePlumber 0.4/0.5 and publish native revision 5; silence root cause remains unconfirmed.
+    status: active
+    load_when:
+      - reviewing Quantum buffering policy matching or revision-5 publication
+      - investigating issue-33 silence after device discovery recovered
   - id: TASK-025
     title: Issue 33 UCM discovery hang investigation
     path: docs/agents/tasks/ucm-discovery-hang.md

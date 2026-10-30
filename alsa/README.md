@@ -74,9 +74,12 @@ ALSA driver names to the same `P2626` profile. Installing both mappings does not
 choose the kernel backend; the explicit full driver install owns that choice
 through `/etc/modprobe.d/quantum2626-backend.conf`. The `P2626` entry also
 permits direct inspection with `alsaucm -c P2626`. The WirePlumber rule matches
-only the Quantum UCM node
-names and aligns `api.alsa.period-num = 4` with the UCM direct-plugin slave's
-`periods 4`. With the current driver, alsa-lib 1.2.8, and WirePlumber 0.4,
+the `snd_quantum` or `snd_quantum2626` driver together with its HiFi playback
+or capture node names. This covers both ACP's UCM device names (such as
+`HiFi__Speaker__sink`) and older PCM-derived names without applying Quantum
+buffering to other sound cards. It aligns `api.alsa.period-num = 4` with the
+UCM direct-plugin slave's `periods 4`. With the current driver, alsa-lib 1.2.8,
+and WirePlumber 0.4,
 ordinary PipeWire playback has live-resolved to four 128-frame periods and a
 512-frame hardware buffer. A configuration parse alone still does not prove
 that geometry; verify the active ALSA PCM.
