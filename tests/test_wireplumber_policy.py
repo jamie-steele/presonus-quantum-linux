@@ -59,6 +59,46 @@ class WirePlumberPolicyTests(unittest.TestCase):
         self.assertEqual(custom.read_text(), "custom policy\n")
         self.assertTrue(self.destination("0.4").is_symlink())
 
+    def test_migrates_published_source_installer_policies_to_corrected_templates(self):
+        for selected_series in policy.POLICIES:
+            with self.subTest(series=selected_series):
+                for series in policy.POLICIES:
+                    destination = self.destination(series)
+                    if destination.is_symlink():
+                        destination.unlink()
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    fixture = ROOT / "tests/fixtures/wireplumber" / destination.name
+                    destination.write_bytes(fixture.read_bytes())
+
+                policy.select_policy(self.root, selected_series)
+                selected = self.destination(selected_series)
+                self.assertTrue(selected.is_symlink())
+                self.assertEqual(selected.readlink(),
+                                 Path("/usr/share/quantum-dkms/wireplumber") / selected.name)
+                other_series = "0.5" if selected_series == "0.4" else "0.4"
+                self.assertFalse(self.destination(other_series).exists())
+
+    def test_preserves_edited_published_policies_without_partial_migration(self):
+        for edited_series in policy.POLICIES:
+            with self.subTest(series=edited_series):
+                original = {}
+                for series in policy.POLICIES:
+                    destination = self.destination(series)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    fixture = ROOT / "tests/fixtures/wireplumber" / destination.name
+                    content = fixture.read_bytes()
+                    if series == edited_series:
+                        content += b"\n# user customization\n"
+                    destination.write_bytes(content)
+                    original[series] = content
+
+                with self.assertRaisesRegex(ValueError, "Preserved customized"):
+                    policy.select_policy(self.root, "0.5")
+                for series, content in original.items():
+                    destination = self.destination(series)
+                    self.assertFalse(destination.is_symlink())
+                    self.assertEqual(destination.read_bytes(), content)
+
     def test_unexpected_symlink_is_preserved(self):
         destination = self.destination("0.4")
         destination.parent.mkdir(parents=True)

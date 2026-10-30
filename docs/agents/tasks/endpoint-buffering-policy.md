@@ -43,3 +43,18 @@ legacy UCM endpoint names in WirePlumber 0.4 and 0.5.
 - Commit and review the focused change, pass hosted distro/APT checks, merge,
   publish native revision 5, and verify its signed APT delivery.
 - Reporter audible confirmation remains separate; no issue comment is authorized.
+
+## Publication migration follow-up
+
+The first native publication run (40987566032) correctly blocked publication:
+the immutable source installer leaves the previous regular Lua policy, while
+revision 5 changes the template. The selector treated the old generated file
+as customized. PR checks had built a fresh source installer with the new policy,
+so their migration fixture did not expose the historical-file difference.
+
+The selector now recognizes only the two exact published legacy policy hashes;
+any edited content remains protected, as do unrelated symlinks and user overrides.
+Immutable historical fixtures test migration in both policy generations and
+ensure edited variants block changes without partially switching either file.
+No revision-5 assets were published by the failed run. Rerun full release gates
+before publication; native revision remains 5.
