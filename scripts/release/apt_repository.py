@@ -33,11 +33,11 @@ def download_packages(repository, destination, suite="experimental"):
             continue
         names = {asset["name"] for asset in release["assets"]}
         for name in sorted(names):
-            match = re.fullmatch(r"native-([1-9][0-9]*(?:~staging\.[1-9][0-9]*)?)-SHA256SUMS", name)
+            match = re.fullmatch(r"native-([1-9][0-9]*(?:[.~]staging\.[1-9][0-9]*)?)-SHA256SUMS", name)
             if not match:
                 continue
             revision = match[1]
-            if suite == "stable" and "~staging." in revision:
+            if suite == "stable" and ("~staging." in revision or ".staging." in revision):
                 continue
             if f"native-{revision}-build-evidence.tar.gz" not in names:
                 continue
@@ -53,11 +53,16 @@ def download_packages(repository, destination, suite="experimental"):
             expected = None
             for line in (download / name).read_text().splitlines():
                 digest, filename = line.split(maxsplit=1)
-                if filename == package_name:
+                if filename.replace("~staging.", ".staging.") == package_name.replace("~staging.", ".staging."):
                     expected = digest
             package = download / package_name
             if hashlib.sha256(package.read_bytes()).hexdigest() != expected:
                 raise ValueError(f"Package checksum mismatch: {tag}/{package_name}")
+            # GitHub normalizes tildes in asset names; preserve the actual DEB
+            # version when assembling the local repository, without changing bytes.
+            normalized_name = package_name.replace(".staging.", "~staging.")
+            if normalized_name != package_name:
+                package.rename(download / normalized_name)
 
 
 def check_freshness(metadata, now=None):

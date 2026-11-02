@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import os
 import shutil
@@ -62,14 +63,37 @@ class ReleaseChannelTests(unittest.TestCase):
 
     def test_stable_asset_discovery_excludes_staging_before_download(self):
         releases = b'''[[{"tag_name":"rfc-20260820.rfc1.s1148921","draft":false,"assets":[
-          {"name":"native-6~staging.42-SHA256SUMS"},
-          {"name":"native-6~staging.42-build-evidence.tar.gz"},
-          {"name":"quantum-dkms_20260820.rfc1.s1148921-6~staging.42_amd64.deb"}
+          {"name":"native-6.staging.42-SHA256SUMS"},
+          {"name":"native-6.staging.42-build-evidence.tar.gz"},
+          {"name":"quantum-dkms_20260820.rfc1.s1148921-6.staging.42_amd64.deb"}
         ]}]]'''
         with tempfile.TemporaryDirectory() as temporary:
             with patch.object(apt, 'run', return_value=releases), patch.object(apt.subprocess, 'run') as fetch:
                 apt.download_packages('owner/repo', Path(temporary), 'stable')
                 fetch.assert_not_called()
+
+    def test_github_asset_spelling_retains_deb_version_and_checksum(self):
+        original = 'quantum-dkms_20260820.rfc1.s1148921-6~staging.42_amd64.deb'
+        transport = original.replace('~', '.')
+        checksums = 'native-6.staging.42-SHA256SUMS'
+        evidence = 'native-6.staging.42-build-evidence.tar.gz'
+        payload = b'unchanged package bytes'
+        releases = [[{'tag_name': 'rfc-20260820.rfc1.s1148921', 'draft': False,
+                      'assets': [{'name': name} for name in [transport, checksums, evidence]]}]]
+
+        def download(arguments, **kwargs):
+            destination = Path(arguments[arguments.index('--dir') + 1])
+            (destination / transport).write_bytes(payload)
+            (destination / checksums).write_text(hashlib.sha256(payload).hexdigest() + '  ' + transport + '\n')
+
+        import json
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(apt, 'run', return_value=json.dumps(releases)), \
+                    patch.object(apt.subprocess, 'run', side_effect=download):
+                apt.download_packages('owner/repo', root, 'experimental')
+            self.assertEqual(list(root.rglob(original))[0].read_bytes(), payload)
+            self.assertEqual(list(root.rglob(transport)), [])
 
     def test_unknown_suites_fail_closed(self):
         for suite in ['../stable', 'dev', 'Stable']:
