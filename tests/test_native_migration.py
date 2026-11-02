@@ -52,6 +52,18 @@ class NativeMigrationTests(unittest.TestCase):
             with self.subTest(candidate=candidate):
                 self.assertEqual(migration.older_release(candidate, TARGET), expected)
 
+    def test_staging_versions_are_valid_targets_and_promote_in_order(self):
+        staged = OLD + "-6~staging.42"
+        self.assertTrue(migration.older_release(OLD + "-5", staged))
+        self.assertTrue(migration.older_release(staged, OLD + "-6"))
+        self.assertFalse(migration.older_release(OLD + "-6", staged))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets, _ = self.assets(root)
+            empty = {"files": [], "sources": [], "dkms_versions": [staged], "review": []}
+            with patch.object(cleanup, "discover", return_value=empty):
+                self.assertIsNone(migration.migrate(staged, root, assets))
+
     def test_removal_backs_up_module_source_and_generated_policy(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

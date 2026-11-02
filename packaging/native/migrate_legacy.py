@@ -29,7 +29,7 @@ def module_files(plan):
 
 
 def migrate(target, root=ROOT, assets=ASSETS):
-    if not re.fullmatch(r"[0-9]{8}\.rfc[0-9]+\.s[0-9]+-[1-9][0-9]*", target):
+    if not re.fullmatch(r"[0-9]{8}\.rfc[0-9]+\.s[0-9]+-[1-9][0-9]*(?:~staging\.[1-9][0-9]*)?", target):
         raise ValueError("Invalid target native version")
     plan = cleanup_state.discover(root)
     versions = [version for version in plan["dkms_versions"] if older_release(version, target)]
