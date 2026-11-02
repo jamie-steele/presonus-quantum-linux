@@ -27,8 +27,8 @@ def package_version(bundle, revision):
     upstream = (bundle / "VERSION").read_text().strip()
     if not re.fullmatch(r"[0-9]{8}\.rfc[0-9]+\.s[0-9]+", upstream):
         raise ValueError("Invalid RFC version")
-    if not re.fullmatch(r"[1-9][0-9]*", revision):
-        raise ValueError("Packaging revision must be a positive integer")
+    if not re.fullmatch(r"[1-9][0-9]*(?:~staging\.[1-9][0-9]*)?", revision):
+        raise ValueError("Packaging revision must be positive, optionally suffixed ~staging.BUILD")
     return upstream, f"{upstream}-{revision}"
 
 
@@ -240,6 +240,7 @@ def build(bundle, output, revision, acp):
     metadata = {
         "upstream": json.loads((bundle / "manifest.json").read_text()),
         "native_version": version,
+        "release_channel": "staging" if "~staging." in revision else "master",
         "acp": json.loads((acp / "manifest.json").read_text()),
         "audio_sha256": {
             str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()

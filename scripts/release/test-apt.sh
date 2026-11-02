@@ -59,6 +59,63 @@ apt-get -o APT::Update::Error-Mode=any update
 apt-get --simulate --no-remove install quantum-dkms
 rm /etc/apt/sources.list.d/quantum-test.list
 
+# Separate signed channels: these tiny fixtures are downloaded, never installed.
+for suite in experimental stable; do
+    mkdir -p "$work/channel-packages/$suite"
+done
+upstream=${old_version%-*}
+for spec in 'experimental 999~staging.1' 'stable 998'; do
+    read -r suite revision <<< "$spec"
+    payload="$work/fixture-$suite"
+    mkdir -p "$payload/DEBIAN"
+    cat > "$payload/DEBIAN/control" <<CONTROL
+Package: quantum-dkms
+Version: $upstream-$revision
+Architecture: amd64
+Maintainer: Disposable channel test <test@example.invalid>
+Description: Offline APT channel fixture; never install
+CONTROL
+    dpkg-deb --build --root-owner-group "$payload" \
+        "$work/channel-packages/$suite/quantum-dkms_${upstream}-${revision}_amd64.deb"
+done
+python3 /workspace/scripts/release/apt_repository.py snapshot \
+    "$work/channel-packages" "$work/channel-public" \
+    --fingerprint "$fingerprint" --base-url https://example.invalid/quantum
+for suite in experimental stable; do
+    channel_root="$work/channel-$suite"
+    mkdir -p "$channel_root/lists/partial" "$channel_root/cache"
+    touch "$channel_root/status"
+    printf 'deb [signed-by=%s] file:%s %s main\n' \
+        "$work/channel-public/quantum-archive-keyring.gpg" "$work/channel-public" "$suite" \
+        > "$channel_root/source.list"
+    channel_options=(
+        -o "Dir::Etc::sourcelist=$channel_root/source.list"
+        -o 'Dir::Etc::sourceparts=-'
+        -o "Dir::State::lists=$channel_root/lists"
+        -o "Dir::State::status=$channel_root/status"
+        -o "Dir::Cache=$channel_root/cache"
+    )
+    apt-get "${channel_options[@]}" -o APT::Update::Error-Mode=any update
+    expected="$upstream-998"
+    [[ "$suite" != experimental ]] || expected="$upstream-999~staging.1"
+    apt-cache "${channel_options[@]}" policy quantum-dkms | grep -F "Candidate: $expected"
+    if [[ "$suite" == stable ]]; then
+        if apt-cache "${channel_options[@]}" policy quantum-dkms | grep -q '~staging'; then
+            echo 'ERROR: stable APT includes a staging package.' >&2
+            exit 1
+        fi
+    fi
+done
+grep -q '^Suites: experimental$' "$work/channel-public/quantum.sources"
+grep -q '^Suites: experimental$' "$work/channel-public/quantum-staging.sources"
+grep -q '^Suites: stable$' "$work/channel-public/quantum-stable.sources"
+sed -i 's/Origin: PreSonus/Origin: Tampered/' "$work/channel-public/dists/stable/InRelease"
+if apt-get "${channel_options[@]}" -o APT::Update::Error-Mode=any update; then
+    echo 'ERROR: stable APT accepted tampered metadata.' >&2
+    exit 1
+fi
+echo 'PASS: separate signed channel candidates, stable isolation and authentication.'
+
 # Corrupt signed metadata: APT must reject it instead of accepting an unsigned feed.
 sed -i 's/Origin: PreSonus/Origin: Tampered/' "$work/public/dists/experimental/InRelease"
 if apt_command apt-get -o APT::Update::Error-Mode=any update; then

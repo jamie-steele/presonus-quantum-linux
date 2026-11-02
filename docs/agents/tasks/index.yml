@@ -7,6 +7,14 @@ task_system:
   template: docs/agents/tasks/task-template.md
 
 tasks:
+  - id: TASK-028
+    title: Development staging and promoted APT channels
+    path: docs/agents/tasks/release-channels.md
+    summary: dev to staging to master promotion with separate experimental/stable APT suites, version ordering and isolated signing.
+    status: active
+    load_when:
+      - changing release-channel publication or APT suite selection
+      - promoting dev to staging or staging to master
   - id: TASK-026
     title: Quantum endpoint buffering policy correction
     path: docs/agents/tasks/endpoint-buffering-policy.md
