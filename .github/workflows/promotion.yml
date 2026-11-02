@@ -1,0 +1,30 @@
+name: Promotion policy
+
+on:
+  pull_request:
+    branches: [dev, staging, master]
+
+permissions:
+  contents: read
+
+jobs:
+  promotion-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce dev to staging to master
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          case "$BASE" in
+            dev) exit 0 ;;
+            staging) expected=dev ;;
+            master) expected=staging ;;
+            *) exit 1 ;;
+          esac
+          if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" || "$HEAD" != "$expected" ]]; then
+            echo "Promote $expected into $BASE; development changes belong in dev." >&2
+            exit 1
+          fi

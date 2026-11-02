@@ -6,9 +6,55 @@ task_system:
   guide: docs/agents/tasks/README.md
   template: docs/agents/tasks/task-template.md
 
-# Legacy implementation and migration work is completed or superseded by upstream.
-# Known limitations remain in notes/CURRENT_STATUS.md; they are not automatic tasks.
-tasks: []
+tasks:
+  - id: TASK-028
+    title: Development staging and promoted APT channels
+    path: docs/agents/tasks/release-channels.md
+    summary: dev to staging to master promotion with separate experimental/stable APT suites, version ordering and isolated signing.
+    status: active
+    load_when:
+      - changing release-channel publication or APT suite selection
+      - promoting dev to staging or staging to master
+  - id: TASK-026
+    title: Quantum endpoint buffering policy correction
+    path: docs/agents/tasks/endpoint-buffering-policy.md
+    summary: Correct Quantum endpoint matching in WirePlumber 0.4/0.5 and publish native revision 5; silence root cause remains unconfirmed.
+    status: active
+    load_when:
+      - reviewing Quantum buffering policy matching or revision-5 publication
+      - investigating issue-33 silence after device discovery recovered
+  - id: TASK-025
+    title: Issue 33 UCM discovery hang investigation
+    path: docs/agents/tasks/ucm-discovery-hang.md
+    summary: Offline reproduction of exponential ACP enumeration for the shipped 39-device UCM layout; reporter confirmation remains pending.
+    status: active
+    load_when:
+      - investigating issue-33 whole-stack discovery stalls or high CPU
+      - reviewing UCM profile-generation complexity and upstream fix candidates
+  - id: TASK-020
+    title: WirePlumber native policy selection
+    path: docs/agents/tasks/wireplumber-native-policy.md
+    summary: Issue-35 native policy selection, upgrade triggers, and obsolete Lua warning prevention.
+    status: active
+    load_when:
+      - changing native WirePlumber policy selection or package file triggers
+      - reviewing issue-35 validation and publication boundaries
+  - id: TASK-019
+    title: Ubuntu migration and cleanup
+    path: docs/agents/tasks/ubuntu-cleanup.md
+    summary: Conservative standalone cleanup and revision-3 DEB migration with pre-unpack backups and disposable distro validation for issue 30.
+    status: active
+    load_when:
+      - changing Ubuntu cleanup or investigating legacy installation residue
+      - reviewing issue-30 cleanup validation
+  - id: TASK-018
+    title: APT metadata renewal recovery
+    path: docs/agents/tasks/apt-renewal-recovery.md
+    summary: Recovered the expired public feed; prepared queue supersession and deployed signature/freshness verification for issue 29.
+    status: active
+    load_when:
+      - investigating APT expiry or a blocked Pages renewal
+      - publishing the issue-29 workflow correction
 
 archives:
   - id: closed-tasks

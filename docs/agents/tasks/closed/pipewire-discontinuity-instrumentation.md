@@ -29,7 +29,7 @@ driver defaults.
 
 ## Relevant Context
 
-- `scripts/quantum2626_loopback_soak.py` owns the fail-closed analyzer and transport helpers.
+- `scripts/linux/quantum2626_loopback_soak.py` owns the fail-closed analyzer and transport helpers.
 - `docs/LOOPBACK_CONTINUITY_TESTING.md` owns the test and artifact contract.
 - `docs/agents/tasks/closed/release-performance-hardening.md` retains the prior direct-ALSA and PipeWire
   controls.
@@ -106,7 +106,7 @@ driver defaults.
 
 ## Changes
 
-- `scripts/quantum2626_loopback_soak.py`: use the isolated extractor for both transports; require
+- `scripts/linux/quantum2626_loopback_soak.py`: use the isolated extractor for both transports; require
   1 MiB PipeWire userspace isolation or the existing direct-ALSA kernel pipes; record and validate
   every helper thread and pre-discovered PipeWire server data loop; emit structured ERR transitions;
   retain terminal instrumentation state in the summary; accept an explicit live rate of 44100 or
@@ -119,11 +119,11 @@ driver defaults.
 
 ## Validation
 
-- `python3 -m py_compile scripts/quantum2626_loopback_soak.py` — pass.
-- `python3 scripts/quantum2626_loopback_soak.py self-test` — three consecutive terminal passes.
-- `python3 scripts/quantum2626_loopback_soak.py self-test --transport pipewire` after the
+- `python3 -m py_compile scripts/linux/quantum2626_loopback_soak.py` — pass.
+- `python3 scripts/linux/quantum2626_loopback_soak.py self-test` — three consecutive terminal passes.
+- `python3 scripts/linux/quantum2626_loopback_soak.py self-test --transport pipewire` after the
   userspace-ring repair — three consecutive terminal passes.
-- `python3 scripts/quantum2626_loopback_soak.py replay --artifact-dir
+- `python3 scripts/linux/quantum2626_loopback_soak.py replay --artifact-dir
   /tmp/quantum2626-loopback-pipewire-post-defaults-calibration-20260818-8` — pass, 29 captures.
 - Existing-artifact parser exercise — pass, four exact roles and 36 transition records.
 - YAML parse of `docs/agents/tasks/index.yml` — pass with TASK-006 present.

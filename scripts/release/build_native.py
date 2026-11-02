@@ -27,8 +27,8 @@ def package_version(bundle, revision):
     upstream = (bundle / "VERSION").read_text().strip()
     if not re.fullmatch(r"[0-9]{8}\.rfc[0-9]+\.s[0-9]+", upstream):
         raise ValueError("Invalid RFC version")
-    if not re.fullmatch(r"[1-9][0-9]*", revision):
-        raise ValueError("Packaging revision must be a positive integer")
+    if not re.fullmatch(r"[1-9][0-9]*(?:~staging\.[1-9][0-9]*)?", revision):
+        raise ValueError("Packaging revision must be positive, optionally suffixed ~staging.BUILD")
     return upstream, f"{upstream}-{revision}"
 
 
@@ -44,12 +44,14 @@ def stage(bundle, destination, version):
     config.write_text(updated)
     # Desktop integration belongs to the packaging revision, not the RFC pin.
     shutil.copytree(ROOT / "alsa/ucm2", destination / "usr/share/alsa/ucm2")
-    # Each WirePlumber generation reads only its own configuration directory.
-    for name, directory in (("51-quantum2626.lua", "main.lua.d"),
-                            ("51-quantum2626.conf", "wireplumber.conf.d")):
-        target = destination / "usr/share/wireplumber" / directory / name
+    # Keep inactive rules outside WirePlumber's deprecated-file scanner.
+    for name in ("51-quantum2626.lua", "51-quantum2626.conf"):
+        target = destination / "usr/share/quantum-dkms/wireplumber" / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / "alsa/wireplumber" / name, target)
+    target = destination / "usr/lib/quantum-dkms/wireplumber_policy.py"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / "packaging/native/wireplumber_policy.py", target)
     target = destination / "etc/modprobe.d/quantum2626-backend.conf"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(bundle / "quantum2626-backend.conf", target)
@@ -61,9 +63,37 @@ def stage(bundle, destination, version):
     shutil.copytree(bundle / "patches", documentation / "patches")
 
 
-def lifecycle(version, command):
+def stage_acp(artifact, destination):
+    """Install the tested runtime fix, never a patch-only placeholder."""
+    metadata = json.loads((artifact / "manifest.json").read_text())
+    patch = ROOT / "packaging/pipewire/0001-stop-after-complete-ucm-profile.patch"
+    if metadata["patch_sha256"] != hashlib.sha256(patch.read_bytes()).hexdigest():
+        raise ValueError("ACP artifact was built with a different patch")
+    router = ROOT / "packaging/pipewire/plugin.c"
+    if metadata["router_sha256"] != hashlib.sha256(router.read_bytes()).hexdigest():
+        raise ValueError("ACP artifact was built with a different router")
+    plugin = artifact / "libspa-alsa.so"
+    if metadata["plugin_sha256"] != hashlib.sha256(plugin.read_bytes()).hexdigest():
+        raise ValueError("ACP plugin checksum mismatch")
+    target = destination / "usr/lib/quantum-dkms/spa-0.2/alsa/libspa-alsa.so"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(plugin, target)
+    shutil.copytree(artifact / "data", destination / "usr/share/quantum-dkms/acp")
+    documentation = destination / "usr/share/doc/quantum-dkms/acp"
+    documentation.mkdir(parents=True)
+    for name in ("COPYING", "LICENSE", "LGPL-2.1", "manifest.json"):
+        shutil.copy2(artifact / name, documentation / name)
+    shutil.copytree(artifact / "source", documentation / "source")
+    target = destination / "usr/lib/systemd/user/wireplumber.service.d/51-quantum-acp.conf"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "packaging/pipewire/wireplumber-service.conf", target)
+
+
+def lifecycle(version, command, migration=False):
     common = (ROOT / "packaging/native/lifecycle.sh").read_text()
-    return f'#!/bin/sh\nversion="{version}"\n' + common + "\n" + command + "\n"
+    helper = "/usr/lib/quantum-dkms/migrate_legacy.py" if migration else ""
+    return (f'#!/bin/sh\nversion="{version}"\nmigration_helper="{helper}"\n'
+            + common + "\n" + command + "\n")
 
 
 def build_deb(payload, output, version, environment):
@@ -74,7 +104,7 @@ Section: kernel
 Priority: optional
 Architecture: amd64
 Maintainer: PreSonus Quantum Linux contributors <jamie-steele@users.noreply.github.com>
-Depends: dkms (>= 2.8.7), build-essential, kmod, alsa-ucm-conf, wireplumber (>= 0.4), initramfs-tools
+Depends: dkms (>= 2.8.7), python3, build-essential, kmod, alsa-ucm-conf, libasound2 (>= 1.2.6), libc6 (>= 2.35), wireplumber (>= 0.4), initramfs-tools
 Homepage: {HOMEPAGE}
 Description: Experimental PreSonus Quantum RFC driver and desktop audio profiles
  Nicholas Johnson's unmerged snd-quantum RFC, built locally through DKMS.
@@ -82,13 +112,32 @@ Description: Experimental PreSonus Quantum RFC driver and desktop audio profiles
  Matching kernel headers must be installed before configuring this package.
 """)
     write(control / "conffiles", "/etc/modprobe.d/quantum2626-backend.conf\n")
+    write(control / "triggers", "interest-noawait /usr/bin/wireplumber\n")
+    helper_dir = payload / "usr/lib/quantum-dkms"
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    for source, name in (
+        (ROOT / "scripts/maintenance/cleanup-ubuntu.py", "cleanup_state.py"),
+        (ROOT / "packaging/native/migrate_legacy.py", "migrate_legacy.py"),
+        (ROOT / "driver/modprobe.d/quantum2626-upstream.conf", "backend-upstream.conf"),
+    ):
+        shutil.copyfile(source, helper_dir / name)
+    identity = hashlib.sha256((ROOT / "driver/modprobe.d/quantum2626-inhouse.conf").read_bytes()).hexdigest()
+    write(helper_dir / "migration-identities.json", json.dumps({"inhouse_policy_sha256": identity}) + "\n")
+    preinst = (ROOT / "packaging/native/preinst.sh").read_text().replace("@INHOUSE_SHA256@", identity)
+    write(control / "preinst", preinst, executable=True)
     scripts = {
-        "postinst": 'case "${1:-}" in configure) configure_module ;; esac',
-        "prerm": 'case "${1:-}" in remove|upgrade|deconfigure) remove_module ;; esac',
+        "postinst": '''case "${1:-}" in
+    configure) configure_module; configure_wireplumber ;;
+    triggered) configure_wireplumber ;;
+esac''',
+        "prerm": '''case "${1:-}" in
+    remove|deconfigure) remove_wireplumber; remove_module ;;
+    upgrade) remove_module ;;
+esac''',
         "postrm": 'case "${1:-}" in remove|purge) refresh_boot_images ;; esac',
     }
     for name, command in scripts.items():
-        write(control / name, lifecycle(version, command), executable=True)
+        write(control / name, lifecycle(version, command, migration=(name == "postinst")), executable=True)
     subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(payload),
                     str(output / f"quantum-dkms_{version}_amd64.deb")],
                    check=True, env=environment)
@@ -105,20 +154,24 @@ def build_rpm(payload, output, upstream, revision, family, work, environment):
         name = "/" + str(path.relative_to(payload))
         if path.is_dir() and (name.startswith(f"/usr/src/quantum-{version}")
                               or name.startswith("/usr/share/doc/quantum-dkms")
+                              or name.startswith("/usr/share/quantum-dkms")
+                              or name.startswith("/usr/lib/quantum-dkms")
+                              or name == "/usr/lib/systemd/user/wireplumber.service.d"
                               or name == "/usr/share/alsa/ucm2/P2626"):
-            files.append("%dir " + name)
+            files.append('%dir "' + name.replace("%", "%%") + '"')
         elif path.is_file():
             prefix = "%config(noreplace) " if name.startswith("/etc/") else ""
-            files.append(prefix + name)
+            files.append(prefix + '"' + name.replace("%", "%%") + '"')
     common = lifecycle(version, "")
     spec = f"""Name: quantum-dkms
 Version: {upstream}
 Release: {release}
 Summary: Experimental PreSonus Quantum RFC driver and desktop audio profiles
-License: GPL-2.0-only AND MIT
+License: GPL-2.0-only AND LGPL-2.1-or-later AND MIT
 URL: {HOMEPAGE}
 BuildArch: x86_64
-Requires: dkms >= 3, gcc, make, kmod, {dependencies}, wireplumber >= 0.4, dracut
+Requires: dkms >= 3, gcc, make, kmod, python3, {dependencies}, wireplumber >= 0.4, dracut
+Requires: glibc >= 2.35, libasound.so.2()(64bit)
 Requires(preun): dkms
 Requires(post): dkms
 AutoReqProv: no
@@ -135,12 +188,19 @@ cp -a {payload}/. %{{buildroot}}/
 %post
 {common}
 configure_module
+configure_wireplumber
+
+%transfiletriggerin -- /usr/bin/wireplumber /usr/share/quantum-dkms/wireplumber
+python3 -B /usr/lib/quantum-dkms/wireplumber_policy.py configure
 
 %preun
 {common}
 # On same-version reinstall the new instance uses the same DKMS registration.
 if [ "${{1:-0}}" = 0 ] || rpm -q --queryformat '%%{{VERSION}}-%%{{RELEASE}}\\n' quantum-dkms | grep -Fxv '{upstream}-{release}' >/dev/null; then
     remove_module
+fi
+if [ "${{1:-0}}" = 0 ]; then
+    remove_wireplumber
 fi
 
 %postun
@@ -154,7 +214,8 @@ refresh_boot_images
     spec_path = top / "quantum.spec"
     write(spec_path, spec)
     subprocess.run(["rpmbuild", "-bb", "--define", f"_topdir {top}",
-                    "--define", "_buildhost reproducible", "--define", "debug_package %{nil}",
+                    "--define", "_buildhost reproducible", "--define", "__strip /bin/true",
+                    "--define", "debug_package %{nil}",
                     "--define", "use_source_date_epoch_as_buildtime 1",
                     "--define", "clamp_mtime_to_source_date_epoch 1", str(spec_path)],
                    check=True, env=environment)
@@ -162,7 +223,7 @@ refresh_boot_images
         shutil.copyfile(rpm, output / rpm.name)
 
 
-def build(bundle, output, revision):
+def build(bundle, output, revision, acp):
     upstream, version = package_version(bundle, revision)
     output.mkdir(parents=True, exist_ok=False)
     timestamp = int(datetime.datetime.strptime(upstream[:8], "%Y%m%d").replace(
@@ -172,12 +233,15 @@ def build(bundle, output, revision):
         work = Path(temporary)
         payload = work / "payload"
         stage(bundle, payload, version)
+        stage_acp(acp, payload)
         build_rpm(payload, output, upstream, revision, "fedora", work, environment)
         build_rpm(payload, output, upstream, revision, "opensuse", work, environment)
         build_deb(payload, output, version, environment)
     metadata = {
         "upstream": json.loads((bundle / "manifest.json").read_text()),
         "native_version": version,
+        "release_channel": "staging" if "~staging." in revision else "master",
+        "acp": json.loads((acp / "manifest.json").read_text()),
         "audio_sha256": {
             str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in sorted((ROOT / "alsa").rglob("*")) if path.is_file()
@@ -197,6 +261,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bundle", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--acp", type=Path, required=True, help="Tested private ACP build artifact")
     parser.add_argument("--revision", default=(ROOT / "packaging/native/revision").read_text().strip())
     arguments = parser.parse_args()
-    build(arguments.bundle.resolve(), arguments.output.resolve(), arguments.revision)
+    build(arguments.bundle.resolve(), arguments.output.resolve(), arguments.revision, arguments.acp.resolve())

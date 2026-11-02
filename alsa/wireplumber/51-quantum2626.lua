@@ -16,16 +16,18 @@ table.insert(alsa_monitor.rules, {
 })
 
 -- Keep the proven 128-frame Quantum 2626 hardware period while providing
--- four periods of buffering for the shared UCM playback nodes. Retain one
--- two periods of playback headroom for the dshare pointer-timing path.
+-- four periods of buffering and two periods of playback headroom.
+-- ACP may name nodes after UCM devices (Speaker, Line3, etc.) or PCM names.
+-- Match the HiFi direction and driver so both layouts remain Quantum-only.
 table.insert(alsa_monitor.rules, {
   matches = {
     {
-      {
-        "node.name",
-        "matches",
-        "alsa_output.*.HiFi__quantum2626_stereo_out_*",
-      },
+      { "alsa.driver_name", "equals", "snd_quantum" },
+      { "node.name", "matches", "alsa_output.*.HiFi__*" },
+    },
+    {
+      { "alsa.driver_name", "equals", "snd_quantum2626" },
+      { "node.name", "matches", "alsa_output.*.HiFi__*" },
     },
   },
   apply_properties = {
@@ -40,11 +42,12 @@ table.insert(alsa_monitor.rules, {
 table.insert(alsa_monitor.rules, {
   matches = {
     {
-      {
-        "node.name",
-        "matches",
-        "alsa_input.*.HiFi__quantum2626_mono_in_*",
-      },
+      { "alsa.driver_name", "equals", "snd_quantum" },
+      { "node.name", "matches", "alsa_input.*.HiFi__*" },
+    },
+    {
+      { "alsa.driver_name", "equals", "snd_quantum2626" },
+      { "node.name", "matches", "alsa_input.*.HiFi__*" },
     },
   },
   apply_properties = {

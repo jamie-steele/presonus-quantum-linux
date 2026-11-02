@@ -5,19 +5,19 @@ The default out-of-tree backend is Nicholas Johnson's upstream RFC `snd-quantum`
 for Quantum 2626, a Thunderbolt 3 interface exposed as PCI device `1c67:0104`.
 
 The public support claims live in `README.md`. Check the selected backend's PCI table and
-`notes/CURRENT_STATUS.md` for what is enabled and proven. In-house evidence is not RFC evidence.
+`research/notes/CURRENT_STATUS.md` for what is enabled and proven. In-house evidence is not RFC evidence.
 
 ## Source Precedence
 
 | Path | Owns |
 | --- | --- |
 | `driver/upstream.lock` | Default RFC provenance; verified source is in the external cache. |
-| `driver/snd-quantum2626.c` | In-house research fallback and its module parameters only. |
+| `driver/inhouse/` | In-house research fallback and its module parameters only. |
 | `CONTRIBUTING.md` | Nicholas's RFC, EMATech collaboration, kernel and UCM submission. |
 | `docs/RELEASES.md` | Experimental source/DKMS releases and distro verification. |
-| `notes/CURRENT_STATUS.md` | Latest consolidated experimental status and known blockers. |
-| `notes/REGISTER_GUESSES.md` | Register hypotheses, confidence, and supporting observations. |
-| `notes/GHIDRA_FINDINGS_SUMMARY.md` | Consolidated static-analysis findings. |
+| `research/notes/CURRENT_STATUS.md` | Latest consolidated experimental status and known blockers. |
+| `research/notes/REGISTER_GUESSES.md` | Register hypotheses, confidence, and supporting observations. |
+| `research/notes/GHIDRA_FINDINGS_SUMMARY.md` | Consolidated static-analysis findings. |
 | `docs/REVERSE_ENGINEERING_PLAN.md` | Repeatable reverse-engineering plan. |
 | `docs/LINUX_TESTING.md` | Live Linux procedure; verify commands against current source before running. |
 | `README.md` | Public project overview; detailed status may lag the focused notes. |
@@ -29,18 +29,24 @@ The public support claims live in `README.md`. Check the selected backend's PCI 
 | --- | --- |
 | `driver/` | Out-of-tree ALSA PCI driver source and kernel-module build. |
 | `alsa/` | UCM desktop routing for the currently proven playback geometry. |
-| `driver-reference/` | Local Windows driver reference material and metadata; proprietary binaries are ignored. |
+| `research/windows/` | Local Windows driver reference material and metadata; proprietary binaries are ignored. |
 | `scripts/ghidra/` | Ghidra analysis scripts and selected analysis outputs. |
-| `scripts/` | Linux device tests, Windows collection, and reverse-engineering helpers. |
-| `notes/` | Durable findings, experiment summaries, and selected text evidence. |
+| `scripts/` | Purpose-based groups; `scripts/README.md` maps Linux, Windows, Ghidra, experiments, and release tools. |
+| `packaging/` | Source-bundle Kbuild, DKMS, and native package assets. |
+| `tests/` | Offline tooling tests and small audio fixtures. |
+| `research/notes/` | Durable findings, experiment summaries, and selected text evidence. |
 | `docs/` | Human-facing plans, runbooks, and testing guides. |
-| `samples/` | Small audio fixtures for explicitly authorized playback tests. |
+| `workflows/` | Optional host wrappers for native build, clean, test, and source verification. |
+
+Use `docs/README.md` and `research/README.md` as the human-facing indexes.
+Ignored `tools/` contains the local Ghidra installation and environment; it is
+not a source tree. Generated Ghidra projects and databases are excluded from Git.
 
 ## Current State
 
 The following is historical in-house evidence from the 2026-08-15 checkpoint,
 not current RFC acceptance. Read the later backend and reinstall checkpoints in
-`notes/CURRENT_STATUS.md` before using it:
+`research/notes/CURRENT_STATUS.md` before using it:
 
 - The module performs a bounded TCI mailbox startup and read-only readiness handshake for the
   verified `1c67:0104` device.
@@ -49,7 +55,7 @@ not current RFC acceptance. Read the later backend and reinstall checkpoints in
   48 kHz/26-channel profile is live-proven; the new TCI rate setter remains offline-verified.
 - A five-second direct-ALSA silence run completed without an xrun and produced the exact expected
   interrupt count. Playback channels 1 and 2 were physically audible through headphone left/right.
-- `notes/CHANNEL_ROUTING.md` records the statically recovered analog, S/PDIF, and ADAT channel order.
+- `research/notes/CHANNEL_ROUTING.md` records the statically recovered analog, S/PDIF, and ADAT channel order.
 - WirePlumber publishes all 13 UCM playback sinks, and one bounded PipeWire Main stream completed
   with advancing DMA interrupts and a clean stop. YouTube playback through the desktop sink is
   physically audible through the connected headphones.

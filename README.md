@@ -125,7 +125,7 @@ not established hardware acceptance results here. Its original PCM code exposes
 26 channels at all advertised rates. The in-house backend's separate 26/18/8
 channel constraints must not be attributed to the RFC. Higher rates, physical
 S/PDIF/ADAT routing, sustained stability, and cross-distro hardware behavior need
-further testing. See [current evidence](notes/CURRENT_STATUS.md).
+further testing. See [current evidence](research/notes/CURRENT_STATUS.md).
 
 ## Releases
 
@@ -176,15 +176,18 @@ verify the actual binding after reboot. Secure Boot needs a trusted module signa
 
 ## Repository map
 
+See the [documentation index](docs/README.md) for development and operator guides,
+and the [research index](research/README.md) for findings and historical evidence.
+
 | Path | Purpose |
 | --- | --- |
 | `driver/upstream.lock` | Reviewed default RFC source and hashes. |
 | `driver/` | Build/install integration and in-house research fallback. |
 | `alsa/` | Fixed-48-kHz UCM routing and WirePlumber policy. |
 | `scripts/release/`, `packaging/`, `.github/workflows/` | RFC detection, source releases, and distro verification. |
-| `notes/CURRENT_STATUS.md` | Canonical hardware evidence and limitations. |
-| `notes/CHANNEL_ROUTING.md`, `notes/TCI_PROTOCOL.md` | Channel layout and recovered protocol. |
-| `scripts/ghidra/`, `driver-reference/` | Discovery helpers; proprietary inputs remain ignored. |
+| `research/notes/CURRENT_STATUS.md` | Canonical hardware evidence and limitations. |
+| `research/notes/CHANNEL_ROUTING.md`, `research/notes/TCI_PROTOCOL.md` | Channel layout and recovered protocol. |
+| `scripts/ghidra/`, `research/windows/` | Discovery helpers; proprietary inputs remain ignored. |
 | `docs/agents/` | Focused agent guidance and durable task records. |
 
 Older findings remain available as research history. Use the current status and

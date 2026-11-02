@@ -1,5 +1,9 @@
 # Experimental RFC releases
 
+Release channels now follow [dev -> staging -> master](RELEASE_CHANNELS.md).
+Staging uses the opt-in `experimental` APT suite; promoted master packages use
+`stable`. The driver remains an unmerged RFC in both channels.
+
 The main driver is Nicholas Johnson's `snd-quantum` RFC. Source bundles contain
 that GPL-2.0 driver unchanged, a DKMS build wrapper, our 48 kHz UCM profile, and
 WirePlumber 0.4/0.5 policy. The release manifest identifies the exact mailing-list
@@ -47,6 +51,15 @@ transaction before accepting. On an older Mint/Ubuntu desktop, inspect `pactl in
 distro's supported audio-session setup before expecting the WirePlumber policy
 to apply. Direct ALSA support and desktop endpoint discovery are separate checks.
 
+The pending native package revision also addresses [issue #35](https://github.com/jamie-steele/presonus-quantum-linux/issues/35):
+policy templates live outside WirePlumber's configuration search paths, and only
+the rule matching the installed version is linked into place. DEB and RPM file
+triggers reselect the rule on WirePlumber upgrades without rebuilding the driver
+or restarting audio. This removes the obsolete-Lua startup warning on 0.5; it
+does not establish a fix for the slowdown reported in issue #33. The selector
+preserves unexpected custom rules for review; DEB pre-unpack backups also retain
+existing package-owned policy files before upgrades replace them.
+
 Install headers matching your distro's exact kernel, including Pop!_OS or HWE
 kernels. Keep Secure Boot enrollment and custom backend/module-load rules under
 local control. Never disable package signature checks to work around another
@@ -91,7 +104,82 @@ errors, install headers, and reinstall the package. Reboot when ready and verify
 `lspci -nnk` reports `snd_quantum`. Secure Boot still requires your distro's DKMS
 key enrollment. Installation success alone is not boot or audio acceptance.
 
-### Migrating from the tar installer
+### Quantum endpoint buffering correction in revision 5
+
+Native revision 5 fixes the WirePlumber 0.4/0.5 buffering rules, which matched
+older PCM-derived endpoint names but missed ACP's UCM device names such as
+`HiFi__Speaker__sink` and `HiFi__LineInput5__source`. Each rule now checks the
+Quantum driver and HiFi direction, covering both naming layouts and both driver
+backends without changing other cards. Playback requests 128-frame periods,
+four periods per buffer, and 256 frames of headroom; capture retains 128/four
+without additional headroom. The kernel RFC and UCM routing are unchanged.
+
+This corrects policy selection; it is not a confirmed fix for the silence or
+periodic buzzing reported after device discovery recovered in issue #33.
+The reporter's forced 1024-frame PipeWire graph quantum is a separate variable.
+Package installation does not restart audio. The corrected policy applies after
+WirePlumber next starts. User-level Quantum policy overrides are preserved and
+can shadow the packaged correction; compare any such override before testing.
+Unmodified policies left by the published source installer are recognized by
+their exact hashes and migrated to the corrected packaged rule. Edited policies
+remain protected, and DEB pre-installation backups retain the previous files.
+
+Revision 5 publication and signed-APT delivery must be verified before asking
+users to upgrade. Offline matching checks do not establish audible acceptance.
+
+### Packaged discovery correction in revision 4
+
+Native revision 4 includes a compiled, private PipeWire ACP plugin to address
+the exponential UCM profile search reproduced for issue #33. The build applies
+the PipeWire patch and includes the resulting library, its mixer data and
+corresponding sources. WirePlumber's package-owned user-service drop-in selects
+it after the next login/reboot. Quantum PCI IDs use the corrected ACP code;
+other devices and factories continue through the distro plugin. Distro
+PipeWire files are not overwritten. See [the implementation and reproduction
+notes](../packaging/pipewire/README.md).
+
+Install/upgrade/removal does not restart audio. Reboot when ready so the user
+manager reloads the service configuration and processes stop using the previous
+library mappings. Custom WirePlumber units or SPA plugin paths need separate
+review. This integration is included in native DEB/RPM packages; the standalone
+source installer does not install the private plugin.
+
+Revision 4 is prepared locally and is not yet published. Hardware confirmation
+on the issue-33 reporter's machine remains pending. The release workflow must
+publish the tested revision before ordinary APT updates can deliver it.
+
+### Automatic legacy migration in DEB revision 3
+
+Revision 3 is prepared for review; it is not yet published to the signed feed.
+The driver RFC is unchanged. The DEB adds Python 3 for conservative migration
+using the same inventory rules as the standalone cleanup tool. RPMs do not run the migration helper.
+
+On installation or upgrade, the DEB saves existing Quantum profiles and backend
+policy under root-only `/var/backups/quantum-migration/preinstall.*` directories
+before unpacking new files. Configuration then builds the replacement for every
+installed kernel with usable headers. Only after all builds succeed does it
+back up and retire recognized older Quantum DKMS registrations and manual
+modules in `updates`/`extra`, then install the new module last. This ordering
+prevents old DKMS removal from deleting the newly installed module. If a build
+fails, this migration has not retired the older tar registration or manual
+module files. Native-package upgrades still follow dpkg's existing maintainer
+script lifecycle. Repair the error and run `sudo dpkg --configure quantum-dkms`
+before rebooting.
+
+The exact generated in-house backend policy is replaced with the RFC policy.
+Customized conffiles retain ordinary dpkg handling. Shared configuration, user
+home overrides, distro modules, other packages' files and unfamiliar/symlinked
+paths are preserved or reported for review. Symlinks at incoming profile paths
+stop pre-installation rather than being followed. Migration does not unload a
+driver, restart services, remove APT configuration or enroll signing keys.
+
+For recognized legacy installs, the revision-3 package removes the need to run a
+separate cleanup first. The standalone tool remains optional recovery/uninstall
+support. Backups are not automatically restored after a failed package
+transaction: inspect them, repair/reconfigure the package, and restore custom
+settings selectively before rebooting.
+
+### Migrating manually with older packages or RPMs
 
 Back up customized Quantum UCM/WirePlumber files and
 `/etc/modprobe.d/quantum2626-backend.conf`. Native packages own the same profile
@@ -100,7 +188,7 @@ is a Debian conffile / RPM `%config(noreplace)` file: retain local settings only
 after confirming they do not blacklist the new `snd-quantum` driver. Review any
 `.dpkg-dist` or `.rpmnew` file. Reconcile custom `modules-load.d` rules separately.
 
-Run `dkms status`. Remove the **old tar-installed Quantum version only**, for example
+Run `dkms status`. For older DEBs and RPMs without automatic migration, remove the **old tar-installed Quantum version only**, for example
 `sudo dkms remove -m quantum -v 20260820.rfc1.s1148921 --all`, before the first native
 install. Do not remove unrelated modules or run the tar installer over the native
 package. This does not unload the currently running module. Subsequent native
@@ -154,10 +242,40 @@ does not automatically add this origin to unattended-upgrades. Remove
 
 The feed retains published native versions, publishes checksums and signed
 `InRelease`/`Release.gpg`, and expires metadata after 14 days. A daily workflow
-refreshes signatures even without new RFCs. If expiry or signature validation
+refreshes signatures even without new RFCs. Each refresh supersedes an older
+running or waiting refresh, so a stuck Pages deployment cannot hold the renewal
+queue indefinitely. After deployment, a read-back check verifies the live
+`InRelease` against the public key retained in Git and requires more than seven
+days of validity remaining. The signing and deployment jobs have execution
+timeouts; environment approval waits are recovered by the next refresh replacing
+the old run, rather than by those execution timeouts. If expiry or signature validation
 fails, repair publication/key configuration; never use `trusted=yes` or disable
 APT authentication to work around it. Key rotation requires explicit review and
 updating the installed keyring.
+
+### Renewal recovery and monitoring
+
+Watch **Quantum signed APT repository** failures and cancellations in Actions.
+A successful signing job alone does not prove Pages deployed the refreshed feed.
+To check the live endpoint without installing a package or changing local APT:
+
+```bash
+python3 scripts/release/apt_repository.py verify https://jamie-steele.github.io/presonus-quantum-linux
+```
+
+If a run is waiting at an environment gate, inspect the gate and deployment policy.
+Cancel the stale **APT workflow run only**, then dispatch `apt-repository.yml` on
+the default branch. Recheck the deployed signature, expiry, and an isolated APT
+update before declaring recovery. Do not approve an old artifact whose signed
+metadata is already expired. Keep `apt-signing` and `github-pages` branch
+restrictions in place.
+
+GitHub schedules can be delayed or disabled on inactive repositories. Check that
+the daily schedule remains enabled; manual dispatch is the recovery path. The
+14-day expiry still protects clients from indefinitely replayed metadata. The
+signing key also has its own expiry: daily metadata renewal does not extend it.
+Renew the key before the date above and distribute the updated public keyring
+through an explicitly reviewed change.
 
 ## Maintainer activation
 
@@ -183,7 +301,10 @@ updating the installed keyring.
    `apt update` against the deployed URL. Signing runs never install release code.
    Successful native/RFC workflows and the daily schedule then refresh the feed.
 
-Published native assets are immutable. Re-running a partially uploaded revision
+Published native assets are immutable. Staging revisions use `N~staging.BUILD`;
+final master revisions use `N`. The master-native workflow must be dispatched
+explicitly after staging promotion; see [release channels](RELEASE_CHANNELS.md).
+ Re-running a partially uploaded revision
 can reuse byte-identical assets; different content fails instead of overwriting.
 Increment `packaging/native/revision` for packaging changes, then rerun the native
 workflow on the same RFC tag. Only the tested revision is published, not the
@@ -245,6 +366,11 @@ directory for the same version is deliberately not overwritten; inspect a failed
 installation before retrying.
 
 ## Remove or roll back
+
+For an inventory and backed-up removal of recognized Ubuntu installations, see
+[Ubuntu cleanup and reinstall](UBUNTU_CLEANUP.md). Preview first; custom/shared
+configuration remains a manual review item. Cleanup does not establish the cause
+of an audio or CPU problem.
 
 Record the installed version with `dkms status`, then run
 `sudo dkms remove -m quantum -v <version> --all` to remove that release's modules.
@@ -343,4 +469,33 @@ and validates staged integration. It does not prove boot, initramfs inclusion,
 Secure Boot enrollment, Thunderbolt enumeration, or physical audio on those distros.
 VM boot tests can extend that evidence, but emulated machines without the interface
 cannot validate its DMA/audio path. Known upstream rate-transition and discovery
-failures remain in `notes/CURRENT_STATUS.md`; every RFC release is experimental.
+failures remain in `research/notes/CURRENT_STATUS.md`; every RFC release is experimental.
+
+### Local DEB migration qualification
+
+After building the native candidate and a synthetic next-revision upgrade, run:
+
+```bash
+python3 -m unittest discover -s tests -v
+QUANTUM_NATIVE_BUNDLE=/absolute/source-downloads \
+QUANTUM_NATIVE_PACKAGES=/absolute/native-candidate \
+QUANTUM_NATIVE_UPGRADE=/absolute/synthetic-upgrade \
+QUANTUM_NATIVE_EVIDENCE=/absolute/test-evidence \
+  bash scripts/release/test-native-matrix.sh
+```
+
+The source-download directory contains the release tarball and `SHA256SUMS`;
+package directories contain the DEBs and their `native-<revision>-manifest.json`.
+This script uses the same package lifecycle and migration scripts as
+CI for Ubuntu 22.04/24.04 and Debian 12/13. The migration case installs the old
+tar release and fallback module, checks pre-unpack backups, deliberately fails a
+replacement build, verifies old registrations remain, then retries configuration
+and checks the new installation. Container results do not establish physical
+audio, Secure Boot enrollment, or bootable initramfs acceptance.
+
+The revision-3 DEB candidate passed local DockPipe qualification on 2026-10-23 for
+Ubuntu 22.04/24.04 and Debian 12/13, including ordinary package upgrade/removal and
+legacy migration. Debian migration fixtures include full matching kernel images
+so the old tar installer's real initramfs refresh can run. The candidate rebuild
+was byte-identical, and all original driver/build/license source files were
+unchanged. Hosted native/RPM gates and revision-3 publication remain pending.

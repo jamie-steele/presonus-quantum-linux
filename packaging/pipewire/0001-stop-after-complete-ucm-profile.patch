@@ -1,0 +1,33 @@
+--- a/spa/plugins/alsa/acp/alsa-ucm.c
++++ b/spa/plugins/alsa/acp/alsa-ucm.c
+@@ -2216,6 +2216,7 @@
+     pa_alsa_ucm_modifier *mod;
+     int i = 0;
+     int n_profiles = 0;
++    bool all_devices;
+     const char *name, *sink, *source;
+     char *p_name, *p_desc, *tmp;
+     unsigned int verb_priority, p_priority;
+@@ -2339,7 +2340,8 @@
+          * name. GUIs usually show the profile description instead of
+          * the name, add the device names to those as well. */
+         tmp = devset_name(p_devices, ", ");
+-        if (pa_idxset_equals(p_devices, verb_devices)) {
++        all_devices = pa_idxset_equals(p_devices, verb_devices);
++        if (all_devices) {
+             p_name = pa_xstrdup(verb_name);
+             p_desc = pa_xstrdup(verb_desc);
+         } else {
+@@ -2361,4 +2363,12 @@
+         pa_xfree(p_desc);
+         pa_idxset_free(p_mappings, NULL);
+         pa_idxset_free(p_devices, NULL);
++
++        /* The full device set is the only maximal set when it is compatible.
++         * Do not enumerate its exponentially many proper subsets. */
++        if (all_devices) {
++            pa_idxset_free(state, NULL);
++            state = NULL;
++            break;
++        }
+     }

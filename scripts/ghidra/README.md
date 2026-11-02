@@ -101,17 +101,17 @@ From the repo root:
 
 ```bash
 # One-time setup: install Java, download and unpack Ghidra to tools/ghidra
-./scripts/setup_ghidra_linux.sh
+./scripts/ghidra/setup_ghidra_linux.sh
 
 # Put the Windows driver binary in the repo (copy from Windows or DriverStore)
-cp /path/to/pae_quantum.sys driver-reference/
+cp /path/to/pae_quantum.sys research/windows/
 
 # Run headless analysis (default: trace_stream_start_writes.py)
-./scripts/run_ghidra_analysis.sh
+./scripts/ghidra/run_ghidra_analysis.sh
 
 # Run a specific script
-./scripts/run_ghidra_analysis.sh find_mmio_registers.py
-./scripts/run_ghidra_analysis.sh trace_stream_start_writes.py
+./scripts/ghidra/run_ghidra_analysis.sh find_mmio_registers.py
+./scripts/ghidra/run_ghidra_analysis.sh trace_stream_start_writes.py
 ```
 
 Optional env vars: `GHIDRA_INSTALL_DIR`, `DRIVER_BIN`, `GHIDRA_PROJECT_DIR`, `GHIDRA_PROJECT_NAME`.
@@ -183,6 +183,6 @@ Scripts can export results to JSON files for further processing:
 
 After running these scripts:
 1. Review the register map
-2. Correlate with Linux MMIO baseline (`notes/MMIO_BASELINE.md`)
+2. Correlate with Linux MMIO baseline (`research/notes/MMIO_BASELINE.md`)
 3. Classify each result as a mailbox, DMA, corroborated non-mailbox, or unproven structure access
 4. Implement only behavior supported by the TCI task's evidence and live-test boundaries

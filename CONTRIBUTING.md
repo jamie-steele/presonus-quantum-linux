@@ -64,10 +64,42 @@ patch. Existing local profile preparation is not evidence of upstream acceptance
 ## Research and releases
 
 Keep observed hardware behavior separate from source analysis and hypotheses.
-Put durable conclusions in `notes/CURRENT_STATUS.md` or the relevant protocol note.
+Put durable conclusions in `research/notes/CURRENT_STATUS.md` or the relevant protocol note.
 Do not upload vendor binaries, bulk traces, generated analysis state, or host IDs.
 
 Release tooling and distro coverage are described in [RELEASES.md](docs/RELEASES.md).
 Run `python3 -m unittest discover -s tests -v` for release logic and use the
 disposable distro checks for DKMS and packaging. None of these checks load a
 module or prove physical audio behavior.
+
+## Optional DockPipe workflows
+
+DockPipe is optional. Native Make commands and Python tests remain fully supported;
+contributors and pull requests do not need DockPipe. With DockPipe installed, run
+these host workflows from the repository root. The project scaffold uses
+`dockpipe.config.json` and `workflows/<name>/config.yml`:
+
+| Operation | DockPipe command | Equivalent native command |
+| --- | --- | --- |
+| Build | `dockpipe --workflow build` | `make -C driver W=1` |
+| Clean | `dockpipe --workflow clean` | `make -C driver clean` |
+| Test | `dockpipe --workflow test` | `python3 -m unittest discover -s tests -v` |
+| Check | `dockpipe --workflow check` | `make -C driver upstream-verify` |
+
+Build and clean require Make and matching kernel headers; build also requires a
+C toolchain. The default upstream build and source-integrity check require the
+pinned source cache: run `make -C driver upstream-sync` once beforehand. Workflows
+do not fetch sources automatically. Test requires Python 3 and runs the same
+offline tooling suite as CI. Check verifies upstream source integrity only.
+
+Existing Make settings can be passed through the environment, for example:
+
+```sh
+QUANTUM_DRIVER=inhouse dockpipe --workflow build
+KDIR=/path/to/kernel/build dockpipe --workflow build
+```
+
+Clean removes generated driver build artifacts through Kbuild. Workflow output
+stays under `build/driver/<backend>/`. These workflows do not install or load modules, change audio services, or run hardware tests.
+Their YAML can be checked with
+`dockpipe workflow validate workflows/build/config.yml` (likewise for the other files).
