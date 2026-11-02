@@ -24,7 +24,8 @@ Debian/RPM prerelease ordering makes the final revision newer than its staging
 builds. Every staging push has an immutable identity. GitHub release asset filenames use
 `N.staging.BUILD` because GitHub normalizes tildes; the DEB/RPM metadata retains
 `N~staging.BUILD`. APT discovery verifies the original checksum and restores the
-version spelling locally without changing package bytes. Both candidate and synthetic
+version spelling locally without changing package bytes. Published checksum entries
+use the transport filenames so direct downloads remain verifiable with `sha256sum`. Both candidate and synthetic
 next-revision packages pass the full native lifecycle and APT test matrices.
 
 A branch merge never silently publishes a master package. After a reviewed

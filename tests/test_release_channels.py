@@ -84,7 +84,7 @@ class ReleaseChannelTests(unittest.TestCase):
         def download(arguments, **kwargs):
             destination = Path(arguments[arguments.index('--dir') + 1])
             (destination / transport).write_bytes(payload)
-            (destination / checksums).write_text(hashlib.sha256(payload).hexdigest() + '  ' + original + '\n')
+            (destination / checksums).write_text(hashlib.sha256(payload).hexdigest() + '  ' + transport + '\n')
 
         import json
         with tempfile.TemporaryDirectory() as temporary:

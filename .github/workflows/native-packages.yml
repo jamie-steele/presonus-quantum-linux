@@ -203,10 +203,14 @@ jobs:
             # explicitly so immutable retries can find and compare existing bytes.
             name=$(printf '%s' "$name" | tr '~' '.')
             mkdir -p /tmp/existing-native /tmp/native-upload
-            cp "$asset" "/tmp/native-upload/$name"
+            if [[ "$name" == *-SHA256SUMS ]]; then
+              sed 's/~staging\./.staging./g' "$asset" > "/tmp/native-upload/$name"
+            else
+              cp "$asset" "/tmp/native-upload/$name"
+            fi
             if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
               gh release download "$TAG" --pattern "$name" --dir /tmp/existing-native
-              cmp "$asset" "/tmp/existing-native/$name"
+              cmp "/tmp/native-upload/$name" "/tmp/existing-native/$name"
             else
               gh release upload "$TAG" "/tmp/native-upload/$name"
             fi
