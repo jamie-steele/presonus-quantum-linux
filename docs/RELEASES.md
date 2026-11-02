@@ -1,5 +1,9 @@
 # Experimental RFC releases
 
+Release channels now follow [dev -> staging -> master](RELEASE_CHANNELS.md).
+Staging uses the opt-in `experimental` APT suite; promoted master packages use
+`stable`. The driver remains an unmerged RFC in both channels.
+
 The main driver is Nicholas Johnson's `snd-quantum` RFC. Source bundles contain
 that GPL-2.0 driver unchanged, a DKMS build wrapper, our 48 kHz UCM profile, and
 WirePlumber 0.4/0.5 policy. The release manifest identifies the exact mailing-list
@@ -297,7 +301,10 @@ through an explicitly reviewed change.
    `apt update` against the deployed URL. Signing runs never install release code.
    Successful native/RFC workflows and the daily schedule then refresh the feed.
 
-Published native assets are immutable. Re-running a partially uploaded revision
+Published native assets are immutable. Staging revisions use `N~staging.BUILD`;
+final master revisions use `N`. The master-native workflow must be dispatched
+explicitly after staging promotion; see [release channels](RELEASE_CHANNELS.md).
+ Re-running a partially uploaded revision
 can reuse byte-identical assets; different content fails instead of overwriting.
 Increment `packaging/native/revision` for packaging changes, then rerun the native
 workflow on the same RFC tag. Only the tested revision is published, not the

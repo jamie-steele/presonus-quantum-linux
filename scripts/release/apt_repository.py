@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a signed experimental APT snapshot from native release packages."""
+"""Build signed, opt-in staging and promoted APT snapshots from native release packages."""
 
 import argparse
 import datetime
@@ -21,8 +21,9 @@ def run(arguments, **kwargs):
     return subprocess.check_output(arguments, **kwargs)
 
 
-def download_packages(repository, destination):
+def download_packages(repository, destination, suite="experimental"):
     """Only complete, published native revisions are eligible for the feed."""
+    validate_suite(suite)
     pages = json.loads(run([
         "gh", "api", "--paginate", "--slurp", f"repos/{repository}/releases?per_page=100",
     ]))
@@ -32,10 +33,12 @@ def download_packages(repository, destination):
             continue
         names = {asset["name"] for asset in release["assets"]}
         for name in sorted(names):
-            match = re.fullmatch(r"native-([1-9][0-9]*)-SHA256SUMS", name)
+            match = re.fullmatch(r"native-([1-9][0-9]*(?:~staging\.[1-9][0-9]*)?)-SHA256SUMS", name)
             if not match:
                 continue
             revision = match[1]
+            if suite == "stable" and "~staging." in revision:
+                continue
             if f"native-{revision}-build-evidence.tar.gz" not in names:
                 continue
             package_name = f"quantum-dkms_{tag[4:]}-{revision}_amd64.deb"
@@ -80,8 +83,14 @@ def check_freshness(metadata, now=None):
     return timestamps["Valid-Until"]
 
 
-def verify(base_url):
+def validate_suite(suite):
+    if suite not in ("experimental", "stable"):
+        raise ValueError("APT suite must be experimental or stable")
+
+
+def verify(base_url, suite="experimental"):
     """Read back the live feed using the public signing key retained in Git."""
+    validate_suite(suite)
     url = urlparse(base_url)
     if url.scheme != "https" or not url.netloc or url.query or url.fragment:
         raise ValueError("APT base URL must be an HTTPS URL without query or fragment")
@@ -93,7 +102,7 @@ def verify(base_url):
             "gpg", "--batch", "--homedir", str(root), "--dearmor",
             "--output", str(keyring), str(public_key),
         ], check=True)
-        metadata_url = base_url.rstrip("/") + "/dists/experimental/InRelease"
+        metadata_url = base_url.rstrip("/") + f"/dists/{suite}/InRelease"
         with urlopen(metadata_url, timeout=30) as response:
             signed = response.read(1024 * 1024 + 1)
         if len(signed) > 1024 * 1024:
@@ -109,7 +118,8 @@ def verify(base_url):
         print(f"PASS: published APT signature verified; valid until {expiry.isoformat()}")
 
 
-def build(packages, output, fingerprint, base_url):
+def build(packages, output, fingerprint, base_url, suite="experimental"):
+    validate_suite(suite)
     if not re.fullmatch(r"[A-Fa-f0-9]{40}", fingerprint):
         raise ValueError("Use the full 40-character signing-key fingerprint")
     url = urlparse(base_url)
@@ -122,16 +132,22 @@ def build(packages, output, fingerprint, base_url):
     if not candidates:
         raise ValueError("No tested native packages available for the APT repository")
     for package in candidates:
-        if not re.fullmatch(r"quantum-dkms_[0-9]{8}\.rfc[0-9]+\.s[0-9]+-[1-9][0-9]*_amd64.deb", package.name):
+        if not re.fullmatch(r"quantum-dkms_[0-9]{8}\.rfc[0-9]+\.s[0-9]+-[1-9][0-9]*(?:~staging\.[1-9][0-9]*)?_amd64\.deb", package.name):
             raise ValueError(f"Unexpected package name: {package.name}")
+        if suite == "stable" and "~staging." in package.name:
+            raise ValueError("Staging packages cannot enter the stable suite")
         fields = run(["dpkg-deb", "-f", str(package), "Package", "Architecture"], text=True)
         if fields != "Package: quantum-dkms\nArchitecture: amd64\n":
             raise ValueError(f"Unexpected package metadata: {package.name}")
+        version = run(["dpkg-deb", "-f", str(package), "Version"], text=True).strip()
+        expected_version = package.name[len("quantum-dkms_"):-len("_amd64.deb")]
+        if version != expected_version:
+            raise ValueError(f"Package filename/version mismatch: {package.name}")
         target = pool / package.name
         if target.exists() and target.read_bytes() != package.read_bytes():
             raise ValueError(f"Conflicting package identity: {package.name}")
         shutil.copyfile(package, target)
-    distribution = output / "dists/experimental"
+    distribution = output / "dists" / suite
     index = distribution / "main/binary-amd64"
     index.mkdir(parents=True)
     metadata = run(["apt-ftparchive", "packages", "pool"], cwd=output)
@@ -147,9 +163,9 @@ def build(packages, output, fingerprint, base_url):
     expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=14)
     options = {
         "Origin": "PreSonus Quantum Linux",
-        "Label": "Quantum experimental RFC drivers",
-        "Suite": "experimental",
-        "Codename": "experimental",
+        "Label": f"Quantum {suite} RFC drivers",
+        "Suite": suite,
+        "Codename": suite,
         "Architectures": "amd64",
         "Components": "main",
         "NotAutomatic": "yes",
@@ -160,7 +176,7 @@ def build(packages, output, fingerprint, base_url):
     for key, value in options.items():
         command.extend(["-o", f"APT::FTPArchive::Release::{key}={value}"])
     release = distribution / "Release"
-    metadata = run(command + ["release", "dists/experimental"], cwd=output)
+    metadata = run(command + ["release", f"dists/{suite}"], cwd=output)
     # Older apt-ftparchive accepts unknown options but omits Valid-Until.
     expiry_field = "Valid-Until: " + expiry.strftime("%a, %d %b %Y %H:%M:%S +0000") + "\n"
     release.write_bytes(expiry_field.encode("ascii") + metadata)
@@ -175,7 +191,7 @@ def build(packages, output, fingerprint, base_url):
     (output / "quantum-archive-keyring.gpg").write_bytes(public_key)
     (output / "SIGNING-KEY-FINGERPRINT").write_text(fingerprint.upper() + "\n")
     (output / "quantum.sources").write_text(
-        f"Types: deb\nURIs: {base_url.rstrip('/')}\nSuites: experimental\n"
+        f"Types: deb\nURIs: {base_url.rstrip('/')}\nSuites: {suite}\n"
         "Components: main\nArchitectures: amd64\n"
         "Signed-By: /etc/apt/keyrings/quantum-archive-keyring.gpg\n"
     )
@@ -189,24 +205,66 @@ def build(packages, output, fingerprint, base_url):
     )
 
 
+def snapshot(packages, output, fingerprint, base_url):
+    """Build both suites in one deployment, keeping package membership separate."""
+    if output.exists():
+        raise ValueError("Snapshot output already exists")
+    with tempfile.TemporaryDirectory(prefix="quantum-apt-suites-") as temporary:
+        roots = []
+        for suite in ("experimental", "stable"):
+            root = Path(temporary) / suite
+            build(packages / suite, root, fingerprint, base_url, suite)
+            roots.append(root)
+        shutil.copytree(roots[0], output)
+        shutil.copytree(roots[1] / "dists/stable", output / "dists/stable")
+        pool = output / "pool/main/q/quantum-dkms"
+        for package in (roots[1] / "pool/main/q/quantum-dkms").iterdir():
+            target = pool / package.name
+            if target.exists() and target.read_bytes() != package.read_bytes():
+                raise ValueError(f"Conflicting shared package: {package.name}")
+            shutil.copyfile(package, target)
+        shutil.copyfile(output / "quantum.sources", output / "quantum-staging.sources")
+        shutil.copyfile(roots[1] / "quantum.sources", output / "quantum-stable.sources")
+        (output / "index.html").write_text(
+            '<!doctype html><html lang="en"><meta charset="utf-8">'
+            '<title>Quantum APT channels</title><h1>Quantum APT channels</h1>'
+            '<p>dev → staging → master. The underlying driver remains an unmerged RFC.</p>'
+            '<p><a href="quantum-staging.sources">Staging: opt-in experimental suite</a></p>'
+            '<p><a href="quantum-stable.sources">Master: promoted stable suite</a></p>'
+            '<p>Install only the channel you intend to follow. Existing quantum.sources '
+            'continues to select experimental.</p></html>\n'
+        )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     download = commands.add_parser("download")
     download.add_argument("repository")
     download.add_argument("destination", type=Path)
+    download.add_argument("--suite", choices=("experimental", "stable"), default="experimental")
     generate = commands.add_parser("build")
     generate.add_argument("packages", type=Path)
     generate.add_argument("output", type=Path)
     generate.add_argument("--fingerprint", required=True)
     generate.add_argument("--base-url", required=True)
+    generate.add_argument("--suite", choices=("experimental", "stable"), default="experimental")
+    combined = commands.add_parser("snapshot")
+    combined.add_argument("packages", type=Path)
+    combined.add_argument("output", type=Path)
+    combined.add_argument("--fingerprint", required=True)
+    combined.add_argument("--base-url", required=True)
     health = commands.add_parser("verify")
     health.add_argument("base_url")
+    health.add_argument("--suite", choices=("experimental", "stable"), default="experimental")
     arguments = parser.parse_args()
     if arguments.command == "download":
-        download_packages(arguments.repository, arguments.destination)
+        download_packages(arguments.repository, arguments.destination, arguments.suite)
     elif arguments.command == "verify":
-        verify(arguments.base_url)
+        verify(arguments.base_url, arguments.suite)
+    elif arguments.command == "snapshot":
+        snapshot(arguments.packages.resolve(), arguments.output.resolve(),
+                 arguments.fingerprint, arguments.base_url)
     else:
         build(arguments.packages.resolve(), arguments.output.resolve(),
-              arguments.fingerprint, arguments.base_url)
+              arguments.fingerprint, arguments.base_url, arguments.suite)

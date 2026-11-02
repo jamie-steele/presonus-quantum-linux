@@ -27,7 +27,7 @@ USER_PATHS = (
     ".config/wireplumber/main.lua.d/51-quantum2626.lua",
     ".config/wireplumber/wireplumber.conf.d/51-quantum2626.conf",
 )
-VERSION = re.compile(r"[0-9]{8}\.rfc[0-9]+\.s[0-9]+(?:-[1-9][0-9]*)?")
+VERSION = re.compile(r"[0-9]{8}\.rfc[0-9]+\.s[0-9]+(?:-[1-9][0-9]*(?:~staging\.[1-9][0-9]*)?)?")
 MODULE = re.compile(r"snd[-_]quantum(?:2626)?\.ko(?:\.(?:xz|gz|zst))?")
 REFERENCE = re.compile(r"quantum|P2626", re.IGNORECASE)
 

@@ -3,7 +3,7 @@ name: Quantum RFC builds and releases
 on:
   pull_request:
   push:
-    branches: [master, main]
+    branches: [dev, staging, master]
   schedule:
     - cron: '23 */6 * * *'
   workflow_dispatch:
@@ -127,8 +127,8 @@ jobs:
     needs: [prepare, distro]
     if: >-
       needs.prepare.outputs.ready == 'true' &&
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
-      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -168,6 +168,7 @@ jobs:
           gh release edit "$TAG" --draft=false --prerelease --latest=false
 
   native-packages:
+    if: github.ref == 'refs/heads/staging'
     needs: [prepare, publish]
     permissions:
       contents: write

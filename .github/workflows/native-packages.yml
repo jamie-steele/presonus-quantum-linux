@@ -2,11 +2,21 @@ name: Quantum native packages
 
 on:
   pull_request:
+  push:
+    branches: [dev, staging]
+    paths:
+      - 'alsa/**'
+      - 'packaging/**'
+      - 'scripts/release/**'
+      - 'scripts/maintenance/**'
+      - 'tests/**'
+      - 'driver/upstream.lock'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       tag:
         description: 'Published RFC tag to package (also supports the first tar-only release)'
-        required: true
+        required: false
         type: string
   workflow_call:
     inputs:
@@ -23,10 +33,11 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event_name == 'pull_request' || contains(fromJSON('["dev","staging","master"]'), github.ref_name)
     runs-on: ubuntu-latest
     outputs:
       revision: ${{ steps.build.outputs.revision }}
+      tag: ${{ steps.build.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +48,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
+          RELEASE_BRANCH: ${{ github.event_name == 'pull_request' && 'preview' || github.ref_name }}
+          BUILD_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -48,6 +61,9 @@ jobs:
             python3 scripts/release/upstream_release.py prepare --series "$series" --output bundle
             TAG=$(python3 -c 'import json; print(json.load(open("bundle/manifest.json"))["tag"])')
           else
+            if [[ -z "$TAG" ]]; then
+              TAG=$(python3 scripts/release/channels.py pinned-tag driver/upstream.lock)
+            fi
             [[ "$TAG" =~ ^rfc-[0-9]{8}\.rfc[0-9]+\.s[0-9]+$ ]]
             mkdir bundle
             gh release view "$TAG" --json isDraft --jq .isDraft | grep -qx false
@@ -60,10 +76,13 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$PWD:/workspace:ro" -v "$PWD/acp-build:/output" \
             quantum-acp-build python3 /workspace/scripts/release/build_acp.py /output/runtime
-          revision=$(cat packaging/native/revision)
-          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" native --acp acp-build/runtime
-          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" upgrade --acp acp-build/runtime --revision "$((revision + 1))"
+          base_revision=$(cat packaging/native/revision)
+          revision=$(python3 scripts/release/channels.py revision "$RELEASE_BRANCH" "$base_revision" "$BUILD_ID")
+          upgrade_revision=$(python3 scripts/release/channels.py revision "$RELEASE_BRANCH" "$((base_revision + 1))" "$BUILD_ID")
+          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" native --acp acp-build/runtime --revision "$revision"
+          python3 scripts/release/build_native.py "extracted/quantum-${TAG#rfc-}" upgrade --acp acp-build/runtime --revision "$upgrade_revision"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: native-input
@@ -127,13 +146,37 @@ jobs:
           name: native-evidence-${{ matrix.id }}
           path: evidence/
 
+  release-check:
+    needs: [build, test, apt-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every package and APT gate
+        env:
+          BUILD: ${{ needs.build.result }}
+          NATIVE: ${{ needs.test.result }}
+          APT: ${{ needs.apt-test.result }}
+        run: |
+          [[ "$BUILD" == success && "$NATIVE" == success && "$APT" == success ]]
+
   publish:
     needs: [build, test, apt-test]
-    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: >-
+      (github.ref == 'refs/heads/staging' &&
+       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
+      (github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require staging ancestry for a master release
+        if: github.ref == 'refs/heads/master'
+        run: |
+          git merge-base --is-ancestor origin/staging HEAD
       - uses: actions/download-artifact@v4
         with:
           name: native-input
@@ -147,7 +190,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ needs.build.outputs.tag }}
           REVISION: ${{ needs.build.outputs.revision }}
         run: |
           set -euo pipefail

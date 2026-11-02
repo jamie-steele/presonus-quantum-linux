@@ -18,7 +18,7 @@ concurrency:
     quantum-apt-pages-${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (github.event_name != 'workflow_run' ||
        (github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+        contains(fromJSON('["staging","master"]'), github.event.workflow_run.head_branch) &&
         github.event.workflow_run.head_repository.full_name == github.repository)) &&
       'publish' || github.run_id }}
   # Each run rebuilds the complete feed. Supersede a stuck deployment so it cannot
@@ -31,7 +31,7 @@ jobs:
       vars.APT_REPOSITORY_ENABLED == 'true' &&
       (github.event_name != 'workflow_run' ||
        (github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+        contains(fromJSON('["staging","master"]'), github.event.workflow_run.head_branch) &&
         github.event.workflow_run.head_repository.full_name == github.repository)) &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
@@ -55,16 +55,18 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y apt-utils gnupg
-          python3 scripts/release/apt_repository.py download "$REPOSITORY" packages
+          python3 scripts/release/apt_repository.py download "$REPOSITORY" packages/experimental --suite experimental
+          python3 scripts/release/apt_repository.py download "$REPOSITORY" packages/stable --suite stable
           export GNUPGHOME
           GNUPGHOME=$(mktemp -d)
           trap 'gpgconf --kill gpg-agent; rm -rf "$GNUPGHOME"' EXIT
           chmod 700 "$GNUPGHOME"
           printf '%s' "$APT_SIGNING_KEY" | gpg --batch --import
           unset APT_SIGNING_KEY
-          python3 scripts/release/apt_repository.py build packages public \
+          python3 scripts/release/apt_repository.py snapshot packages public \
             --fingerprint "$APT_SIGNING_FINGERPRINT" --base-url "$BASE_URL"
           gpgv --keyring "$PWD/public/quantum-archive-keyring.gpg" public/dists/experimental/InRelease
+          gpgv --keyring "$PWD/public/quantum-archive-keyring.gpg" public/dists/stable/InRelease
       - uses: actions/upload-pages-artifact@v4
         with:
           path: public
@@ -94,7 +96,8 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in {1..6}; do
-            if python3 scripts/release/apt_repository.py verify "$BASE_URL"; then
+            if python3 scripts/release/apt_repository.py verify "$BASE_URL" --suite experimental &&
+               python3 scripts/release/apt_repository.py verify "$BASE_URL" --suite stable; then
               exit 0
             fi
             if [[ "$attempt" -lt 6 ]]; then
