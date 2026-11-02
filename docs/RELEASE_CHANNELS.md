@@ -21,7 +21,10 @@ merely because channel infrastructure has been added.
 `packaging/native/revision` holds the next positive final revision, initially 6.
 A staging build uses `N~staging.GITHUB_RUN_ID`; a master release uses `N`.
 Debian/RPM prerelease ordering makes the final revision newer than its staging
-builds. Every staging push has an immutable identity. Both candidate and synthetic
+builds. Every staging push has an immutable identity. GitHub release asset filenames use
+`N.staging.BUILD` because GitHub normalizes tildes; the DEB/RPM metadata retains
+`N~staging.BUILD`. APT discovery verifies the original checksum and restores the
+version spelling locally without changing package bytes. Both candidate and synthetic
 next-revision packages pass the full native lifecycle and APT test matrices.
 
 A branch merge never silently publishes a master package. After a reviewed

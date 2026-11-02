@@ -19,6 +19,16 @@ no signing environment access is added to staging. Existing experimental clients
 retain their channel, and master revision 5 bootstraps the stable suite. Publishing
 new final revision 6 remains an explicit later master dispatch.
 
+## Verification and publication evidence
+
+- 70 local tests passed; all six native lifecycle and four signed-APT jobs passed.
+- PR #42 feature -> dev, PR #43 dev -> staging, PR #44 staging -> master merged.
+- Staging publication run 41399433188 uploaded revision 6~staging.41399433188.
+- Public readback found GitHub normalizes tilde asset filenames to dots, causing
+  APT discovery to skip the uploaded candidate. Correct discovery/checksum mapping
+  and explicit retry-safe transport filenames before accepting public channels.
+- Sample-rate candidate remains offline and excluded; no host audio mutation.
+
 ## Remaining work
 
 - Offline and hosted lifecycle/channel validation.
