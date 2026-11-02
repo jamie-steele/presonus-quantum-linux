@@ -4,10 +4,10 @@ Load this guide for edits under `driver/` or for claims about the current kernel
 
 ## Read First
 
-1. `notes/CURRENT_STATUS.md`
+1. `research/notes/CURRENT_STATUS.md`
 2. `driver/upstream.lock` and its verified external source for the default backend;
-   `driver/snd-quantum2626.c` only for the in-house fallback
-3. `notes/REGISTER_GUESSES.md` when changing MMIO behavior
+   `driver/inhouse/` only for the in-house fallback
+3. `research/notes/REGISTER_GUESSES.md` when changing MMIO behavior
 4. `driver/README.md` for the operator-facing build surface
 5. `docs/LINUX_TESTING.md` only when live testing is in scope
 

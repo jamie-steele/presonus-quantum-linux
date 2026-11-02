@@ -36,7 +36,7 @@ driver as the explicit fallback.
   owns external synchronization and verification.
 - Upstream message ID:
   `<20260820083646.11383-2-nicholas.johnson-opensource@outlook.com.au>`.
-- `notes/CURRENT_STATUS.md` remains authoritative for live in-house evidence.
+- `research/notes/CURRENT_STATUS.md` remains authoritative for live in-house evidence.
 
 ## Constraints
 

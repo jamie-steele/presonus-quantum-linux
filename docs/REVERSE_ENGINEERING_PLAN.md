@@ -17,11 +17,11 @@ Run on a Windows machine with the Quantum 2626 and the PreSonus driver installed
    .\windows_re_next_run.ps1
    ```
    That finds `pae_quantum.sys`, runs string extraction, and writes:
-   - `../driver-reference/strings_pae_quantum.txt` (all strings, for search/grep)
-   - `../driver-reference/strings_interesting.txt` (filtered: offsets, PCI, buffer, etc.)
+   - `../research/windows/strings_pae_quantum.txt` (all strings, for search/grep)
+   - `../research/windows/strings_interesting.txt` (filtered: offsets, PCI, buffer, etc.)
 
 2. **Copy driver binary to repo**  
-   Ensure `pae_quantum.sys` is in `driver-reference/` (or in a local folder you keep for Ghidra). The script reports the source path.
+   Ensure `pae_quantum.sys` is in `research/windows/` (or in a local folder you keep for Ghidra). The script reports the source path.
 
 3. **Optional: full driver copy**  
    Re-run or use existing:
@@ -35,9 +35,9 @@ Run on a Windows machine with the Quantum 2626 and the PreSonus driver installed
 1. **Capture MMIO at load**  
    After loading the driver:
    ```bash
-   ./scripts/capture_mmio_baseline.sh
+   ./scripts/experiments/capture_mmio_baseline.sh
    ```
-   Saves current MMIO lines from dmesg to `notes/MMIO_baseline_<date>.txt`.
+   Saves current MMIO lines from dmesg to `research/notes/MMIO_baseline_<date>.txt`.
 
 2. **Capture MMIO at prepare/trigger** (optional, needs `dump_on_trigger=1`)  
    With the driver built with dump-on-trigger support:
@@ -47,7 +47,7 @@ Run on a Windows machine with the Quantum 2626 and the PreSonus driver installed
    systemctl --user stop wireplumber
    aplay -D plughw:4,0 -r 48000 -f S16_LE -c 2 /dev/zero &
    sleep 3
-   sudo dmesg | grep -E "MMIO|quantum" | tail -80 > notes/MMIO_during_playback.txt
+   sudo dmesg | grep -E "MMIO|quantum" | tail -80 > research/notes/MMIO_during_playback.txt
    kill %1 2>/dev/null
    systemctl --user start wireplumber
    ```
@@ -74,7 +74,7 @@ Run on a Windows machine with the Quantum 2626 and the PreSonus driver installed
    - DMA descriptors if present  
 
 4. **Document**  
-   - Add a short “Register guesses” section to `notes/MMIO_BASELINE.md` or a new `notes/REGISTER_GUESSES.md` with offset → suspected role and source (e.g. “Ghidra: write 1 to 0x?? before starting”).
+   - Add a short “Register guesses” section to `research/notes/MMIO_BASELINE.md` or a new `research/notes/REGISTER_GUESSES.md` with offset → suspected role and source (e.g. “Ghidra: write 1 to 0x?? before starting”).
 
 ---
 
@@ -103,12 +103,12 @@ Run on a Windows machine with the Quantum 2626 and the PreSonus driver installed
 
 | Item | Purpose |
 |------|--------|
-| `scripts/windows_re_strings.ps1` | Extract all + interesting strings from pae_quantum.sys → driver-reference/ |
-| `scripts/windows_re_next_run.ps1` | Full “next run”: run strings, print copy + Ghidra checklist |
-| `scripts/capture_mmio_baseline.sh` | Save dmesg MMIO lines to notes/MMIO_baseline_YYYYMMDD_HHMM.txt |
-| `scripts/probe_during_playback.sh` | Run aplay, capture dmesg to notes/ (use with dump_on_trigger=1) |
-| `notes/MMIO_BASELINE.md` | Known BAR 0 values at load (update as you find more) |
-| `notes/REGISTER_GUESSES.md` | You create: offset → suspected role from Ghidra |
+| `scripts/windows/windows_re_strings.ps1` | Extract all + interesting strings from pae_quantum.sys → research/windows/ |
+| `scripts/windows/windows_re_next_run.ps1` | Full “next run”: run strings, print copy + Ghidra checklist |
+| `scripts/experiments/capture_mmio_baseline.sh` | Save dmesg MMIO lines to research/notes/MMIO_baseline_YYYYMMDD_HHMM.txt |
+| `scripts/experiments/probe_during_playback.sh` | Run aplay, capture dmesg to research/notes/ (use with dump_on_trigger=1) |
+| `research/notes/MMIO_BASELINE.md` | Known BAR 0 values at load (update as you find more) |
+| `research/notes/REGISTER_GUESSES.md` | You create: offset → suspected role from Ghidra |
 
 ---
 

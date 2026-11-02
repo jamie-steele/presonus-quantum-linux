@@ -32,7 +32,7 @@ entries:
     path: docs/agents/driver-development.md
     summary: Defines the source paths, safety boundaries, and verification sequence for driver edits.
     load_when:
-      - changing driver/snd-quantum2626.c or driver/Makefile
+      - changing driver/inhouse/ or driver/Makefile
       - changing PCI, ALSA, DMA, IRQ, MMIO, PCM, or module-parameter behavior
       - reviewing a driver implementation claim
     related:

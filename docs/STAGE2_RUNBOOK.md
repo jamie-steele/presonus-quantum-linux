@@ -10,7 +10,7 @@ Run this on a **Windows 11** machine where the Quantum 2626 is connected and wor
 
 - [ ] Quantum 2626 connected via Thunderbolt and recognized in Windows (e.g. PreSonus Universal Control shows it).
 - [ ] Device Manager and/or PowerShell run (steps below).
-- [ ] `notes/windows_profile.txt` filled and saved (template in repo).
+- [ ] `research/notes/windows_profile.txt` filled and saved (template in repo).
 
 ---
 
@@ -42,7 +42,7 @@ Get-PnpDevice | Where-Object { $_.FriendlyName -match "Quantum|PreSonus|Thunderb
 }
 ```
 
-Copy the output into `notes/windows_profile.txt` or the “PowerShell output” section of the template.
+Copy the output into `research/notes/windows_profile.txt` or the “PowerShell output” section of the template.
 
 ---
 
@@ -71,7 +71,7 @@ On Linux we already have: **Region 0** = Memory at 0x64000000, size 1 MiB. Compa
 
 ## Step 4: Fill and save the profile
 
-1. Open `notes/windows_profile.txt` in this repo (or copy the template from the end of this runbook).
+1. Open `research/notes/windows_profile.txt` in this repo (or copy the template from the end of this runbook).
 2. Fill every field you can from Steps 1–3.
 3. Save the file in the repo so we can use it for driver work.
 
@@ -79,18 +79,18 @@ On Linux we already have: **Region 0** = Memory at 0x64000000, size 1 MiB. Compa
 
 ## Step 5: (Optional) Run the capture script
 
-In the repo there is **scripts/windows_capture_quantum.ps1**. On Windows:
+In the repo there is **scripts/windows/windows_capture_quantum.ps1**. On Windows:
 
 1. Copy it to your Windows machine (or clone the repo).
 2. In PowerShell: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` (if scripts are blocked).
 3. Run: `.\windows_capture_quantum.ps1`
-4. Copy the generated output into `notes/` (e.g. `notes/windows_capture.txt`).
+4. Copy the generated output into `research/notes/` (e.g. `research/notes/windows_capture.txt`).
 
 ---
 
-## Template: `notes/windows_profile.txt`
+## Template: `research/notes/windows_profile.txt`
 
-Copy this into `notes/windows_profile.txt` and fill it in:
+Copy this into `research/notes/windows_profile.txt` and fill it in:
 
 ```text
 # Quantum 2626 — Windows 11 profile (Stage 2)

@@ -29,20 +29,20 @@ Run with the device **unplugged**, then **plug in** (after authorizing if prompt
 
 ```bash
 # PCI devices (Thunderbolt devices often show as PCIe)
-lspci -nnvv > notes/lspci_after_plug.txt
+lspci -nnvv > research/notes/lspci_after_plug.txt
 
 # Kernel messages (look for Thunderbolt, PCI, ALSA, snd)
-dmesg | tail -100 > notes/dmesg_after_plug.txt
+dmesg | tail -100 > research/notes/dmesg_after_plug.txt
 
 # ALSA playback / capture devices
-aplay -l   > notes/aplay_l.txt
-arecord -l > notes/arecord_l.txt
+aplay -l   > research/notes/aplay_l.txt
+arecord -l > research/notes/arecord_l.txt
 
 # Optional: list all sound cards
-cat /proc/asound/cards >> notes/alsa_cards.txt
+cat /proc/asound/cards >> research/notes/alsa_cards.txt
 ```
 
-Save everything under `notes/` (create the folder if needed).
+Save everything under `research/notes/` (create the folder if needed).
 
 ### 1.3 Interpret Phase 1
 
@@ -61,7 +61,8 @@ Save everything under `notes/` (create the folder if needed).
 
 Use **only when you need to reverse-engineer** the device for driver work (e.g. capture driver behavior, resource usage, or protocol details). Not needed for basic diagnosis — Linux already gives us the PCI ID (1c67:0104). If Linux never shows the device, fix Thunderbolt/auth first; use Windows to confirm identity only if that’s still unclear.
 
-See **[WINDOWS_PROFILING.md](WINDOWS_PROFILING.md)** for the exact steps (Device Manager, PowerShell, optional tools).
+See [Windows register monitoring](WINDOWS_REGISTER_MONITORING.md) for the retained
+Windows investigation procedure and its limitations.
 
 ---
 
@@ -72,7 +73,7 @@ See **[WINDOWS_PROFILING.md](WINDOWS_PROFILING.md)** for the exact steps (Device
   - Add a quirk or new entry in an existing driver.
   - Plan a minimal kernel or userspace driver.
 
-- **Notes:** Keep `notes/` updated with:
+- **Notes:** Keep `research/notes/` updated with:
   - `lspci -nnvv` (and `dmesg`) from Linux.
   - Vendor/Device ID and driver name from Windows.
   - Any links to datasheets or reverse-engineering notes.

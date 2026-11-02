@@ -26,8 +26,8 @@ card discovery from repository helpers over assuming a fixed ALSA card number.
 - Relevant dmesg excerpts with timestamps and an explanation of what they establish.
 - Unexpected host state, timeouts, xruns, or fallback paths.
 
-Keep raw or large captures outside Git. Promote concise findings to `notes/CURRENT_STATUS.md`,
-`notes/REGISTER_GUESSES.md`, or another existing canonical note.
+Keep raw or large captures outside Git. Promote concise findings to `research/notes/CURRENT_STATUS.md`,
+`research/notes/REGISTER_GUESSES.md`, or another existing canonical note.
 
 ## Stop Conditions
 

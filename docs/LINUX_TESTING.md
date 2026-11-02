@@ -1,7 +1,7 @@
 # Linux driver testing
 
 The default backend is Nicholas Johnson's `snd-quantum` RFC, pinned in
-`driver/upstream.lock`. Read [CURRENT_STATUS.md](../notes/CURRENT_STATUS.md)
+`driver/upstream.lock`. Read [CURRENT_STATUS.md](../research/notes/CURRENT_STATUS.md)
 before a live test: compilation is not audio acceptance, and historical in-house
 results do not transfer to the RFC.
 

@@ -20,9 +20,9 @@ distinct concern. Link to source documents instead of copying large sections fro
 
 ## Sources Of Truth
 
-- Product and project status belongs in the root `README.md` and focused files under `notes/`.
+- Product and project status belongs in the root `README.md` and focused files under `research/notes/`.
 - Default driver behavior belongs in the RFC source pinned by `driver/upstream.lock`;
-  `driver/snd-quantum2626.c` owns only the fallback. Build usage is in `driver/README.md`.
+  `driver/inhouse/` owns only the fallback. Build usage is in `driver/README.md`.
 - RFC distribution and distro verification belong in `docs/RELEASES.md`; upstream submission
   and collaboration belong in `CONTRIBUTING.md`.
 - Repeatable operator procedures belong under `docs/` and `scripts/`.

@@ -23,16 +23,16 @@ case "$family" in
             headers=linux-headers-generic
         fi
         apt-get install -y --no-install-recommends build-essential dkms kmod \
-            "$headers" python3 alsa-utils alsa-ucm-conf wireplumber initramfs-tools ca-certificates
+            "$headers" python3 libasound2-dev alsa-utils alsa-ucm-conf wireplumber initramfs-tools ca-certificates
         ;;
     fedora)
         dnf install -y gcc make dkms kernel-devel kernel-headers kmod python3 \
-            alsa-utils alsa-ucm alsa-ucm-utils wireplumber dracut findutils diffutils tar gzip
+            alsa-lib-devel alsa-utils alsa-ucm alsa-ucm-utils wireplumber dracut findutils diffutils tar gzip
         ;;
     opensuse)
         zypper --non-interactive refresh
         zypper --non-interactive install gcc make dkms kernel-default-devel \
-            kmod python3 alsa-utils alsa-ucm-conf wireplumber dracut findutils diffutils tar gzip
+            kmod python3 alsa-devel alsa-utils alsa-ucm-conf wireplumber dracut findutils diffutils tar gzip
         ;;
     arch)
         pacman -Syu --noconfirm --needed base-devel dkms linux-headers kmod python \
@@ -80,8 +80,7 @@ bash "$package/host-tools.sh" check
 if [[ -z "$native_dir" ]]; then
     bash "$package/host-tools.sh" wireplumber
 else
-    # Native packages install both policy formats and do not call the old tar
-    # installer's version probe. Validate the current helper independently.
+    # Validate the current version probe rather than the immutable tar helper.
     bash /workspace/driver/scripts/host-tools.sh wireplumber
 fi
 
@@ -96,6 +95,11 @@ dkms remove -m quantum -v "$version" --all
 
 if [[ -n "$native_dir" ]]; then
     bash /workspace/scripts/release/test-native.sh "$family" "$native_dir" "$upgrade_dir" "$kernel"
+    case "$family" in
+        ubuntu|debian)
+            bash /workspace/scripts/release/test-migration.sh "$package" "$native_dir" "$kernel"
+            ;;
+    esac
 else
     python3 /workspace/scripts/release/validate-audio.py "$package/alsa"
 fi

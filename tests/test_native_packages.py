@@ -1,3 +1,5 @@
+import datetime
+from email.utils import format_datetime
 import importlib.util
 import hashlib
 import os
@@ -72,6 +74,7 @@ class NativePackageTests(unittest.TestCase):
             native.write(root / "alsa/ucm2/P2626/HiFi.conf", "compatible profile\n")
             native.write(root / "alsa/wireplumber/51-quantum2626.lua", "lua\n")
             native.write(root / "alsa/wireplumber/51-quantum2626.conf", "json\n")
+            native.write(root / "packaging/native/wireplumber_policy.py", "policy helper\n")
             with patch.object(native, "ROOT", root):
                 native.stage(bundle, destination, version)
             self.assertEqual((destination / "usr/share/alsa/ucm2/P2626/HiFi.conf").read_text(),
@@ -82,6 +85,38 @@ class NativePackageTests(unittest.TestCase):
                              (bundle / "module/quantum_main.c").read_bytes())
             self.assertEqual((source / "dkms.conf").read_text(), f'PACKAGE_VERSION="{version}"\n')
             self.assertNotIn("-2", (bundle / "module/dkms.conf").read_text())
+            self.assertTrue((destination / "usr/share/quantum-dkms/wireplumber/51-quantum2626.lua").is_file())
+            self.assertTrue((destination / "usr/share/quantum-dkms/wireplumber/51-quantum2626.conf").is_file())
+            self.assertFalse((destination / "usr/share/wireplumber").exists())
+
+    def test_deb_selects_policy_on_configure_and_wireplumber_upgrade(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = root / "payload"
+            with patch.object(native.subprocess, "run"):
+                native.build_deb(payload, root, "20260820.rfc1.s1148921-3", {})
+            control = payload / "DEBIAN"
+            self.assertEqual((control / "triggers").read_text(),
+                             "interest-noawait /usr/bin/wireplumber\n")
+            postinst = (control / "postinst").read_text()
+            self.assertIn("configure) configure_module; configure_wireplumber", postinst)
+            self.assertIn("triggered) configure_wireplumber", postinst)
+            self.assertIn("remove|deconfigure) remove_wireplumber; remove_module",
+                          (control / "prerm").read_text())
+
+    def test_rpm_reselects_policy_at_transaction_end_and_removes_on_final_uninstall(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = root / "payload"
+            payload.mkdir()
+            with patch.object(native.subprocess, "run"):
+                native.build_rpm(payload, root, "20260820.rfc1.s1148921", "3",
+                                 "fedora", root, {})
+            spec = (root / "fedora/quantum.spec").read_text()
+            self.assertIn("kmod, python3,", spec)
+            self.assertIn("%transfiletriggerin -- /usr/bin/wireplumber "
+                          "/usr/share/quantum-dkms/wireplumber", spec)
+            self.assertIn('if [ "${1:-0}" = 0 ]; then\n    remove_wireplumber\nfi', spec)
 
     def test_lifecycle_is_shell_syntax_valid_and_has_no_live_mutation(self):
         text = native.lifecycle("20260820.rfc1.s1148921-1", "configure_module")
@@ -89,6 +124,47 @@ class NativePackageTests(unittest.TestCase):
         for command in ("modprobe", "rmmod", "systemctl", "service"):
             self.assertNotRegex(text, rf"(?m)^\s*{command}\s")
         self.assertIn('dkms remove -m quantum -v "$version" --all', text)
+
+    def test_apt_health_requires_signed_validity_with_recovery_headroom(self):
+        now = datetime.datetime(2026, 10, 23, tzinfo=datetime.timezone.utc)
+        cases = (
+            (now, now + datetime.timedelta(days=14), True),
+            (now, now + datetime.timedelta(days=7, seconds=1), True),
+            (now, now + datetime.timedelta(days=7), False),
+            (now - datetime.timedelta(days=17), now - datetime.timedelta(days=3), False),
+            (now + datetime.timedelta(hours=1), now + datetime.timedelta(days=14), False),
+            (now, now - datetime.timedelta(seconds=1), False),
+        )
+        for published, expiry, healthy in cases:
+            with self.subTest(published=published, expiry=expiry):
+                metadata = (
+                    f"Date: {format_datetime(published)}\n"
+                    f"Valid-Until: {format_datetime(expiry)}\n"
+                )
+                if healthy:
+                    self.assertEqual(apt.check_freshness(metadata, now), expiry)
+                else:
+                    with self.assertRaises(ValueError):
+                        apt.check_freshness(metadata, now)
+
+    def test_apt_health_rejects_missing_duplicate_and_unzoned_dates(self):
+        now = datetime.datetime(2026, 10, 23, tzinfo=datetime.timezone.utc)
+        published = f"Date: {format_datetime(now)}\n"
+        expiry = f"Valid-Until: {format_datetime(now + datetime.timedelta(days=14))}\n"
+        for metadata in (published, expiry, published + published + expiry,
+                         published + expiry + expiry,
+                         published + "Valid-Until: Fri, 06 Nov 2026 00:00:00\n"):
+            with self.subTest(metadata=metadata), self.assertRaises(ValueError):
+                apt.check_freshness(metadata, now)
+
+    def test_apt_health_does_not_parse_unverified_metadata(self):
+        with patch.object(apt.subprocess, "run") as command, patch.object(apt, "urlopen") as fetch:
+            fetch.return_value.__enter__.return_value.read.return_value = b"tampered signature"
+            command.side_effect = [None, subprocess.CalledProcessError(1, "gpgv")]
+            with patch.object(apt, "check_freshness") as freshness:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    apt.verify("https://example.invalid/quantum")
+                freshness.assert_not_called()
 
     def test_apt_requires_https_and_full_fingerprint(self):
         with tempfile.TemporaryDirectory() as temporary:

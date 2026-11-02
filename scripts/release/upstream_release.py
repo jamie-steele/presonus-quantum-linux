@@ -280,7 +280,7 @@ def prepare(series_id, output):
             "Thunderbolt, reboot binding, or Secure Boot enrollment.\n\n"
             "This is an unmerged RFC snapshot, not a mainline kernel release. "
             "Known DMA/rate-transition failures remain documented in the repository's "
-            "notes/CURRENT_STATUS.md.\n\n"
+            "research/notes/CURRENT_STATUS.md.\n\n"
             f"Source SHA-256: `{tree_hash}`\n"
         )
     print(json.dumps(manifest))

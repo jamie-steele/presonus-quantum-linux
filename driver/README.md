@@ -9,6 +9,11 @@ Two build-selectable backends are available here:
   external verified cache as `snd-quantum.ko`;
 - `inhouse` builds the locally developed `snd-quantum2626.ko` fallback.
 
+The fallback is organized into rate policy, mailbox, DMA, PCM, IRQ, and PCI
+components under [inhouse/](inhouse/README.md). Its internal layout and concurrency
+boundaries are documented there. `inhouse/Kbuild` owns its composite-module build;
+the backend selectors and output module names remain unchanged.
+
 The backends are intentionally separate implementations. This makes the RFC
 usable as the forward integration base while retaining an immediate source
 fallback to the hardware-tested in-house driver. `upstream.lock` is the
@@ -41,7 +46,7 @@ DMA/IOMMU faults and command timeouts. A later cold boot returned the complete
 13/26 graph and a good listening interval, but the active PCM rate was not
 captured before playback closed. Do not transfer in-house acceptance to the
 upstream implementation or treat the cold-boot interval as sustained acceptance.
-Read `../notes/CURRENT_STATUS.md` before any activation or duplex validation.
+Read `../research/notes/CURRENT_STATUS.md` before any activation or duplex validation.
 
 The original RFC uses card ID `Quantum2626` by default, exposes 26 channels at
 all advertised rates, and accepts 32-512-frame periods. It contains RawMIDI,
@@ -81,6 +86,22 @@ make QUANTUM_DRIVER=inhouse
 The equivalent convenience targets are `make inhouse` and `make upstream`.
 An unknown `QUANTUM_DRIVER` value fails the build instead of silently choosing
 a backend.
+
+Generated modules, objects, dependency files, and symbol tables stay outside
+this source directory:
+
+- `build/driver/upstream/snd-quantum.ko`
+- `build/driver/inhouse/snd-quantum2626.ko`
+
+These paths are relative to the repository root. `make clean` cleans generated
+output for both backends. Set `BUILD_ROOT=/absolute/output/path` to override
+the default `build/driver/` root when building, cleaning, or installing.
+Installation reads the module from the selected backend's output directory.
+
+The wrapper stages individual source-file links and Kbuild inputs inside each
+output directory. Kbuild writes there, leaving `driver/` and the verified upstream
+cache free of build output. This uses the same Kbuild interface on older kernels
+that lack separate external-module output support.
 
 ## Install
 
@@ -130,7 +151,7 @@ normal Main stereo endpoint plus Line 3-4, Line 5-6, Line 7-8, S/PDIF 1-2, and
 ADAT 1-16 as stereo pairs sharing the same hardware stream. Matching mono input
 sources independently expose Mic/Instrument 1-2, Line 3-8, S/PDIF 1-2, and
 ADAT 1-16. See
-`../notes/CHANNEL_ROUTING.md` for the complete zero-based binding table.
+`../research/notes/CHANNEL_ROUTING.md` for the complete zero-based binding table.
 
 ## Debug module parameters
 
