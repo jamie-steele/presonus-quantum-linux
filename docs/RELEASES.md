@@ -392,6 +392,14 @@ a Patchwork **series ID**, or detect the oldest unpublished matching series.
 The workflow must be merged/pushed to the default branch and Actions enabled;
 GitHub may delay or disable scheduled runs in inactive repositories.
 
+RFC discovery and source downloads make up to three attempts for timeouts,
+connection interruptions, temporary DNS failures, and HTTP 408/429/500/502/503/504,
+waiting two and then four seconds between attempts. Each attempt retains the
+60-second socket timeout and response-size limit. Retry diagnostics go to stderr
+so discovery stdout remains a series ID. Persistent failures still fail the run;
+permission errors, invalid certificates, and invalid content are not retried.
+This handles brief upstream outages, not prolonged service unavailability.
+
 Discovery requires the ALSA project, Nicholas's exact public submitter address,
 Quantum in the series name, an RFC subject, and a complete series. This is
 source filtering, not cryptographic email authentication. A contributor branch
