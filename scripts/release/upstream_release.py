@@ -6,15 +6,19 @@ import datetime
 import email.policy
 import gzip
 import hashlib
+import http.client
 import io
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
+import sys
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -26,6 +30,8 @@ AUTHOR = "nicholas.johnson-opensource@outlook.com.au"
 FIRST_SERIES = 1148921
 FIRST_DATE = "2026-08-20"
 MAX_RESPONSE = 16 * 1024 * 1024
+DOWNLOAD_ATTEMPTS = 3
+RETRY_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
 
 
 def read_source_lock():
@@ -37,13 +43,37 @@ def read_source_lock():
     return values
 
 
+def is_transient_download_error(error):
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in RETRY_HTTP_STATUSES
+    if isinstance(error, urllib.error.URLError):
+        error = error.reason
+    if isinstance(error, socket.gaierror):
+        return error.errno == socket.EAI_AGAIN
+    return isinstance(error, (TimeoutError, ConnectionError, http.client.IncompleteRead))
+
+
 def download(url, token=None):
     headers = {"User-Agent": "quantum-rfc-release/1.0"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(request, timeout=60) as response:
-        payload = response.read(MAX_RESPONSE + 1)
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                payload = response.read(MAX_RESPONSE + 1)
+            break
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
+            if not is_transient_download_error(error) or attempt == DOWNLOAD_ATTEMPTS:
+                raise
+            delay = 2 ** attempt
+            # Discovery stdout is consumed as a series ID by the workflow.
+            print(
+                f"Temporary download failure ({type(error).__name__}); "
+                f"retrying in {delay}s (attempt {attempt + 1}/{DOWNLOAD_ATTEMPTS})",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
     if len(payload) > MAX_RESPONSE:
         raise ValueError("Response exceeds the release input limit")
     return payload
